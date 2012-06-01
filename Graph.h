@@ -22,7 +22,9 @@
 
 struct edge_info {
   int edge_id;
-  int neighbor_id;
+  int out_vertex;
+  int in_vertex;
+  //int neighbor_id;
 } edge_info;
 
 template<typename VertexType, typename EdgeType>
@@ -36,6 +38,7 @@ class Graph {
     std::map<int, int> temp_outDegree;
     std::map<int, int> temp_inDegree;
    
+    std::vector<struct edge_info> temp_edges; 
     VertexType* vertexData;
     EdgeType* edgeData;
     int* outDegree;

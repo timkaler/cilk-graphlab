@@ -5,17 +5,20 @@
 #include "bag.cpp"
 #include "Graph.cpp"
 #include "engine.cpp"
-void pagerank_update(int vid,
-                     void* scheduler);
-
 #include "scheduler.cpp"
 
+// Parameters for the pagerank demo application
+double termination_bound = 1e-10;
+double random_reset_prob = 0.15;   // PageRank random reset probability
+
+// Simple [0,1] RNG
 double tfkRand(double fMin, double fMax)
 {
     double f = (double)rand() / RAND_MAX;
     return fMin + f * (fMax - fMin);
 }
 
+// Simple timer for benchmarks
 double tfk_get_time()
 {
     struct timeval t;
@@ -24,134 +27,23 @@ double tfk_get_time()
     return t.tv_sec + t.tv_usec*1e-6;
 }
 
-bool load_graph_from_file(const std::string& filename);
-double termination_bound = 1e-7;
-double random_reset_prob = 0.10;   // PageRank random reset probability
+// Programmer defined vertex and edge structures.
+struct vdata{
+  double value;
+  double self_weight; // GraphLab does not support edges from vertex to itself, so
+  // we save weight of vertex's self-edge in the vertex data
+  vdata(double value = 1) : value(value), self_weight(0) { }
+};
+struct edata {
+  double weight;
+  double old_source_value;
+  edata(double weight = 1) :
+    weight(weight), old_source_value(0) { } 
+};
 
-  struct vdata{
-    double value;
-    double self_weight; // GraphLab does not support edges from vertex to itself, so
-    // we save weight of vertex's self-edge in the vertex data
-    vdata(double value = 1) : value(value), self_weight(0) { }
-  };
-  struct edata {
-    double weight;
-    double old_source_value;
-    edata(double weight = 1) :
-      weight(weight), old_source_value(0) { } 
-  };
-
-  Scheduler* scheduler;
-  Graph<vdata, edata>* graph;
-
-
-/**
- * The Page rank update function
- */
-void pagerank_update(int vid,
-                     void* scheduler_void) {
-  Scheduler* scheduler = (Scheduler*) scheduler_void;
-  // Get the data associated with the vertex
-  vdata* vd = graph->getVertexData(vid);
-  
-  // Sum the incoming weights; start by adding the 
-  // contribution from a self-link.
-  double sum = vd->value*vd->self_weight;
-
-  struct edge_info* in_edges = graph->getInEdges(vid);
-  int in_degree = graph->getInDegree(vid);
-
-  for (int i = 0; i < in_degree; i++) {
-    // Get the neighbor vertex value.
-    vdata* neighbor_vdata = graph->getVertexData(in_edges[i].neighbor_id);
-    double neighbor_value = neighbor_vdata->value;
-
-    // Get the edge data for the neighbor.
-    edata* ed = graph->getEdgeData(in_edges[i].edge_id);
-    
-    // Compute the contribution for the neighbor, and add it to the sum.
-    double contribution = ed->weight * neighbor_value;
-    sum += contribution;
-
-    // Remember this value as last read from the neighbor.
-    ed->old_source_value = neighbor_value;
-  }
-
-  // compute the jumpweight
-  sum = random_reset_prob/graph->num_vertices() + 
-    (1-random_reset_prob)*sum;
-  vd->value = sum;
-  
-
-  struct edge_info* out_edges = graph->getOutEdges(vid);
-  int out_degree = graph->getOutDegree(vid);
-
-  for (int i = 0; i < out_degree; i++) {
-    edata* ed = graph->getEdgeData(out_edges[i].edge_id);
-    
-    // Compute edge-specific residual by comparing the new value of this
-    // vertex to the previous value seen by the neighbor vertex.
-    double residual = 
-        ed->weight * std::fabs(ed->old_source_value - vd->value);
-
-    // If the neighbor changed sufficiently add to scheduler.
-    if (residual > termination_bound) {
-      //printf("scheduling task from wtihin pagerank function\n");
-      scheduler->add_task(out_edges[i].neighbor_id, &pagerank_update);
-    }
-  }
-} // end of pagerank update function
-
-
-/*  void update_function (int vid, Scheduler* scheduler) {
-    scheduler->add_task(vid, &update_function);
-  }
-*/
-
-int main(int argc, char **argv)
-{
-  graph = new Graph<vdata, edata>();
-
-  double load_start = tfk_get_time();
-  load_graph_from_file(std::string(argv[1]));
-  double load_end = tfk_get_time();
-
-  printf("Time to load graph %g \n", load_end - load_start);
-
-  double sum = 0;
-  srand(1);
-  for (int i = 0; i < graph->num_vertices(); i++) {
-    graph->getVertexData(i)->value = 1 + tfkRand(0, 1);
-    sum += graph->getVertexData(i)->value;
-  }
-
-  for (int i = 0; i < graph->num_vertices(); i++) {
-    graph->getVertexData(i)->value = graph->getVertexData(i)->value / sum; 
-  } 
-
-  double color_start = tfk_get_time();
-  int colorCount = graph->compute_coloring();
-  double color_end = tfk_get_time();
-
-  scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices());
-  for (int i = 0; i < graph->num_vertices(); i++){ 
-    scheduler->add_task(i, &pagerank_update);
-  }
-  
-  engine<vdata, edata>* e = new engine<vdata, edata>(graph, scheduler);
-   
-
-  double start = tfk_get_time();
-  e->run();
-  double end = tfk_get_time();
-
-  printf("Time spent coloring %f \n", (color_end-color_start));
-  printf("Time spent iterating %f \n", (end-start));
-  for (int i = 0; i < 5; i++) {
-    printf("vertex %d value is %g \n", i, graph->getVertexData(i)->value);
-  }
-  return 0;
-}
+// The scheduler and graph objects.
+Scheduler* scheduler;
+Graph<vdata, edata>* graph;
 
 /**
  * Load a graph file specified in the format:
@@ -197,9 +89,9 @@ bool load_graph_from_file(const std::string& filename) {
     << "Finished loading graph with: " << std::endl
     << "\t Vertices: " << graph->num_vertices() << std::endl
     << "\t Edges: " << graph->num_edges() << std::endl;
-
   graph->finalize();
-  std::cout << "Normalizing out edge weights." << std::endl;
+
+//  std::cout << "Normalizing out edge weights." << std::endl;
   // This could be done in graphlab but the focus of this app is
   // demonstrating pagerank
   for(int vid = 0; 
@@ -225,14 +117,122 @@ bool load_graph_from_file(const std::string& filename) {
       graph->getEdgeData(out_edges[i].edge_id)->weight /= sum;
     } 
   }
-  std::cout << "Finished normalizing edes." << std::endl;
+  //std::cout << "Finished normalizing edes." << std::endl;
 
-  std::cout 
+  /*std::cout 
     << "Finalizing graph." << std::endl
     << "\t This is required for the locking protocol to function correctly"
     << std::endl;
 
   std::cout << "Finished finalization!" << std::endl;
+*/
   return true;
 } // end of load graph
+
+/**
+ * The Page rank update function
+ */
+void pagerank_update(int vid,
+                     void* scheduler_void) {
+  Scheduler* scheduler = (Scheduler*) scheduler_void;
+  // Get the data associated with the vertex
+  vdata* vd = graph->getVertexData(vid);
+  
+  // Sum the incoming weights; start by adding the 
+  // contribution from a self-link.
+  double sum = vd->value*vd->self_weight;
+
+  struct edge_info* in_edges = graph->getInEdges(vid);
+  int in_degree = graph->getInDegree(vid);
+
+  for (int i = 0; i < in_degree; i++) {
+    // Get the neighbor vertex value.
+    vdata* neighbor_vdata = graph->getVertexData(in_edges[i].out_vertex);
+    double neighbor_value = neighbor_vdata->value;
+
+    // Get the edge data for the neighbor.
+    edata* ed = graph->getEdgeData(in_edges[i].edge_id);
+    
+    // Compute the contribution for the neighbor, and add it to the sum.
+    double contribution = ed->weight * neighbor_value;
+    sum += contribution;
+
+    // Remember this value as last read from the neighbor.
+    ed->old_source_value = neighbor_value;
+  }
+
+  // compute the jumpweight
+  sum = random_reset_prob/graph->num_vertices() + 
+    (1-random_reset_prob)*sum;
+  vd->value = sum;
+  
+
+  struct edge_info* out_edges = graph->getOutEdges(vid);
+  int out_degree = graph->getOutDegree(vid);
+
+  for (int i = 0; i < out_degree; i++) {
+    edata* ed = graph->getEdgeData(out_edges[i].edge_id);
+    
+    // Compute edge-specific residual by comparing the new value of this
+    // vertex to the previous value seen by the neighbor vertex.
+    double residual = 
+        ed->weight * std::fabs(ed->old_source_value - vd->value);
+
+    // If the neighbor changed sufficiently add to scheduler.
+    if (residual > termination_bound) {
+      scheduler->add_task(out_edges[i].in_vertex, &pagerank_update);
+    }
+  }
+} // end of pagerank update function
+
+int main(int argc, char **argv)
+{
+  graph = new Graph<vdata, edata>();
+
+  double load_start = tfk_get_time();
+  load_graph_from_file(std::string(argv[1]));
+  double load_end = tfk_get_time();
+
+
+  double sum = 0;
+  srand(1);
+  for (int i = 0; i < graph->num_vertices(); i++) {
+    graph->getVertexData(i)->value = 1 + tfkRand(0, 1);
+    sum += graph->getVertexData(i)->value;
+  }
+
+  for (int i = 0; i < graph->num_vertices(); i++) {
+    graph->getVertexData(i)->value = graph->getVertexData(i)->value / sum; 
+  } 
+
+  double color_start = tfk_get_time();
+  int colorCount = graph->compute_coloring();
+  double color_end = tfk_get_time();
+
+  scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices());
+  for (int i = 0; i < graph->num_vertices(); i++){ 
+    scheduler->add_task(i, &pagerank_update);
+  }
+  
+  engine<vdata, edata>* e = new engine<vdata, edata>(graph, scheduler);
+   
+
+  double start = tfk_get_time();
+  e->run();
+  double end = tfk_get_time();
+  printf("\n Graph Coloring: %d colors used \n", colorCount);
+
+  printf("\n*** Benchmark Results ***\n");
+  printf("Time to load graph %g \n", load_end - load_start);
+  printf("Time spent coloring %f \n", (color_end-color_start));
+  printf("Time spent iterating %f \n", (end-start));
+  printf("Total runtime (including loading graph) %f \n", load_end + color_end + end - load_start - color_start - start);
+  printf("Total runtime (not including loading graph) %f \n", color_end + end - color_start - start);
+  
+  printf("\n*** First 5 pagerank values ***\n");
+  for (int i = 0; i < 5; i++) {
+    printf("vertex %d value is %g \n", i, graph->getVertexData(i)->value);
+  }
+  return 0;
+}
 

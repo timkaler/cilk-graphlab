@@ -20,7 +20,7 @@ void Scheduler::add_task(int vid, void (*the_update_function) (int, void*)) {
   if (__sync_bool_compare_and_swap(&vertex_task_added[vid], 0, 1)) {
     update_task t;
     t.vid = vid;
-    t.update_fun = &pagerank_update;
+    t.update_fun = the_update_function;
     assert(vertexColors[vid] < colorCount && vertexColors[vid]>=0);
     nextBags[vertexColors[vid]]->insert(t);
   }
