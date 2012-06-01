@@ -7,11 +7,11 @@ Graph<VertexType, EdgeType>::Graph< VertexType,  EdgeType>() {
 template<typename VertexType, typename EdgeType>
 void Graph< VertexType,  EdgeType>::addEdge(int vid1, int vid2, EdgeType edgeInfo){
   // increment vertex degrees.
-  outDegree[vid1]++;
-  inDegree[vid2]++;
+  temp_outDegree[vid1]++;
+  temp_inDegree[vid2]++;
 
   // store the edge data.
-  edgeData[nextEdgeId] = edgeInfo;
+  temp_edgeData[nextEdgeId] = edgeInfo;
 
   // create in and out edges.
   struct edge_info out_edge;
@@ -32,7 +32,7 @@ template<typename VertexType, typename EdgeType>
 void Graph<VertexType, EdgeType>::addVertex(int vid, VertexType vdata){
   assert(vertexCount > vid);
   //vertexCount++;
-  vertexData[vid] = vdata;
+  temp_vertexData[vid] = vdata;
 }
 
 template<typename VertexType, typename EdgeType>
@@ -48,13 +48,27 @@ void Graph<VertexType, EdgeType>::finalize(){
   out_edge_index = (int*) malloc(sizeof(int) * nextEdgeId);
   in_edge_index = (int*) malloc(sizeof(int) * nextEdgeId);
 
+  vertexData = (VertexType*) malloc(sizeof(VertexType) * vertexCount); 
+  edgeData = (EdgeType*) malloc(sizeof(EdgeType) * nextEdgeId);
+  outDegree = (int*) malloc(sizeof(int) * vertexCount);
+  inDegree = (int*) malloc(sizeof(int) * vertexCount);
+
+  // read in edge data.
+  for (int i = 0; i < nextEdgeId; i++) {
+    edgeData[i] = temp_edgeData[i];
+  }
+
   int outEdgePosition = 0;
   int inEdgePosition = 0;
   for (int i = 0; i < vertexCount; i++) {
     // record the start index of this vertex into the two arrays.
     out_edge_index[i] = outEdgePosition;
     in_edge_index[i] = inEdgePosition;
-    
+   
+    vertexData[i] = temp_vertexData[i];
+    outDegree[i] = temp_outDegree[i];
+    inDegree[i] = temp_inDegree[i];   
+ 
     // read temporary out edges out into finalized array.
     for (int j = 0; j < outDegree[i]; j++) {
       out_edges[outEdgePosition++] = temp_out_edges[i][j];

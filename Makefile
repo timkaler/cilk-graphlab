@@ -7,7 +7,7 @@ AR=ar
 
 all: main
 
-main : main.cpp Graph.cpp Graph.h bag.cpp bag.h scheduler.cpp scheduler.h Makefile
+main : main.cpp Graph.cpp Graph.h bag.cpp bag.h scheduler.cpp scheduler.h engine.cpp engine.h Makefile
 	$(CILK) $(CILKFLAGS) $@.cpp $(LDFLAGS) -o $@
 
 clean :

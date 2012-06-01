@@ -16,7 +16,6 @@ class Scheduler {
       int vid;
       void (*update_fun) (int, void*);
     };
-
   private:
     Bag_reducer<update_task>** currentBags;
     Bag_reducer<update_task>** nextBags;

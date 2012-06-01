@@ -1,14 +1,32 @@
 #include <assert.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #include "bag.cpp"
 #include "Graph.cpp"
+#include "engine.cpp"
 void pagerank_update(int vid,
                      void* scheduler);
 
 #include "scheduler.cpp"
 
+double tfkRand(double fMin, double fMax)
+{
+    double f = (double)rand() / RAND_MAX;
+    return fMin + f * (fMax - fMin);
+}
 
-double termination_bound = 1e-10;
-double random_reset_prob = 0.15;   // PageRank random reset probability
+double tfk_get_time()
+{
+    struct timeval t;
+    struct timezone tzp;
+    gettimeofday(&t, &tzp);
+    return t.tv_sec + t.tv_usec*1e-6;
+}
+
+bool load_graph_from_file(const std::string& filename);
+double termination_bound = 1e-7;
+double random_reset_prob = 0.10;   // PageRank random reset probability
 
   struct vdata{
     double value;
@@ -26,133 +44,6 @@ double random_reset_prob = 0.15;   // PageRank random reset probability
   Scheduler* scheduler;
   Graph<vdata, edata>* graph;
 
-/**
- * Load a graph file specified in the format:
- *
- *   source_id <tab> target_id <tab> weight
- *   source_id <tab> target_id <tab> weight
- *   source_id <tab> target_id <tab> weight
- *               ....
- *
- * The file should not contain repeated edges.
- */
-bool load_graph_from_file(const std::string& filename) {
-  std::ifstream fin(filename.c_str());
-  if(!fin.good()) return false;
-  // Loop through file reading each line
-  while(fin.good() && !fin.eof()) {
-    size_t source = 0;
-    size_t target = 0;
-    float weight = -1;
-    fin >> source;
-    if(!fin.good()) break;
-    //  fin.ignore(1); // skip comma
-    fin >> target;
-    assert(fin.good());
-    //  fin.ignore(1); // skip comma
-    fin >> weight;
-    assert(fin.good());
-    // Ensure that the number of vertices is correct
-    if(source >= graph->num_vertices() ||
-       target >= graph->num_vertices())
-      graph->resize(std::max(source, target) + 1);
-    if(source != target) {
-      // Add the edge
-      edata e(weight);
-      graph->addEdge(source, target, e);
-    } else {
-      // add the self edge by updating the vertex weight
-      graph->getVertexData(source)->self_weight = weight;
-    }       
-  }
-
-  std::cout 
-    << "Finished loading graph with: " << std::endl
-    << "\t Vertices: " << graph->num_vertices() << std::endl
-    << "\t Edges: " << graph->num_edges() << std::endl;
-
-  graph->finalize();
-  std::cout << "Normalizing out edge weights." << std::endl;
-  // This could be done in graphlab but the focus of this app is
-  // demonstrating pagerank
-  for(int vid = 0; 
-      vid < graph->num_vertices(); ++vid) {
-    vdata* vd = graph->getVertexData(vid);
-    // Initialze with self out edge weight
-    double sum = vd->self_weight;
-    struct edge_info* out_edges = graph->getOutEdges(vid);
-
-    // Sum up weight on out edges
-    for(size_t i = 0; i < graph->getOutDegree(vid); ++i) {
-      sum += graph->getEdgeData(out_edges[i].edge_id)->weight;
-    }
-
-    if (sum == 0) {
-        vd->self_weight = 1.0;
-        sum = 1.0; //Dangling page
-    }
-
-    assert(sum > 0);
-    // divide everything by sum
-    vd->self_weight /= sum;
-    for(size_t i = 0; i < graph->getOutDegree(vid); ++i) {
-      graph->getEdgeData(out_edges[i].edge_id)->weight /= sum;
-    } 
-  }
-  std::cout << "Finished normalizing edes." << std::endl;
-
-  std::cout 
-    << "Finalizing graph." << std::endl
-    << "\t This is required for the locking protocol to function correctly"
-    << std::endl;
-
-  std::cout << "Finished finalization!" << std::endl;
-  return true;
-} // end of load graph
-
-  void process_update_task(Scheduler::update_task task) {
-    // code to process the update task here.
-    task.update_fun(task.vid, scheduler); 
-  } 
-
-  void process_update_tasks(const Scheduler::update_task* tasks, int taskCount) {
-    for (int i = 0; i < taskCount; i++) {
-      process_update_task(tasks[i]);
-    }
-  }
-
-  void parallel_process_pennant(Pennant<Scheduler::update_task>* p, int fillSize) {
-    if (p->getLeft() != NULL) {
-      cilk_spawn parallel_process_pennant(p->getLeft(), BLK_SIZE);
-    }
-    if (p->getRight() != NULL){
-      cilk_spawn parallel_process_pennant(p->getRight(), BLK_SIZE);
-    }
-    process_update_tasks(p->getElements(), fillSize);
-    
-    cilk_sync;
-    if (p->getLeft() != NULL) {
-      delete p->getLeft();
-    }
-
-    if (p->getRight() != NULL) {
-      delete p->getRight();
-    }
-  }
-  void parallel_process(Bag<Scheduler::update_task>* bag) {
-    Pennant<Scheduler::update_task>* p = NULL;
-    if (bag->getFill() > 0) {
-      bag->split(&p);
-      cilk_spawn parallel_process(bag);
-      parallel_process_pennant(p, BLK_SIZE);
-    } else {
-      process_update_tasks(bag->getFilling(), bag->getFillingSize());
-    }
-    cilk_sync;
-    if (p != NULL) {
-      delete p;
-    }
-  }
 
 /**
  * The Page rank update function
@@ -220,31 +111,128 @@ void pagerank_update(int vid,
 int main(int argc, char **argv)
 {
   graph = new Graph<vdata, edata>();
+
+  double load_start = tfk_get_time();
   load_graph_from_file(std::string(argv[1]));
+  double load_end = tfk_get_time();
+
+  printf("Time to load graph %g \n", load_end - load_start);
+
   double sum = 0;
+  srand(1);
   for (int i = 0; i < graph->num_vertices(); i++) {
-    graph->getVertexData(i)->value = 1.5;
-    sum += 1.5;
+    graph->getVertexData(i)->value = 1 + tfkRand(0, 1);
+    sum += graph->getVertexData(i)->value;
   }
+
   for (int i = 0; i < graph->num_vertices(); i++) {
     graph->getVertexData(i)->value = graph->getVertexData(i)->value / sum; 
   } 
 
-  int colorCount = graph->compute_coloring(); 
+  double color_start = tfk_get_time();
+  int colorCount = graph->compute_coloring();
+  double color_end = tfk_get_time();
+
   scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices());
   for (int i = 0; i < graph->num_vertices(); i++){ 
     scheduler->add_task(i, &pagerank_update);
   }
-  int iterationCount = 0;
-  Bag<Scheduler::update_task>* b = scheduler->get_task_bag();
-  while (b->numElements() > 0 /*&& iterationCount < 40*/) {
-    iterationCount++;
-    parallel_process(b); 
-    b = scheduler->get_task_bag(); 
-  }
+  
+  engine<vdata, edata>* e = new engine<vdata, edata>(graph, scheduler);
+   
+
+  double start = tfk_get_time();
+  e->run();
+  double end = tfk_get_time();
+
+  printf("Time spent coloring %f \n", (color_end-color_start));
+  printf("Time spent iterating %f \n", (end-start));
   for (int i = 0; i < 5; i++) {
-    printf("vertex %d value is %f \n", i, graph->getVertexData(i)->value);
+    printf("vertex %d value is %g \n", i, graph->getVertexData(i)->value);
   }
-  printf("total iterations %d \n", iterationCount);
   return 0;
 }
+
+/**
+ * Load a graph file specified in the format:
+ *
+ *   source_id <tab> target_id <tab> weight
+ *   source_id <tab> target_id <tab> weight
+ *   source_id <tab> target_id <tab> weight
+ *               ....
+ *
+ * The file should not contain repeated edges.
+ */
+bool load_graph_from_file(const std::string& filename) {
+  std::ifstream fin(filename.c_str());
+  if(!fin.good()) return false;
+  // Loop through file reading each line
+  while(fin.good() && !fin.eof()) {
+    size_t source = 0;
+    size_t target = 0;
+    float weight = -1;
+    fin >> source;
+    if(!fin.good()) break;
+    //  fin.ignore(1); // skip comma
+    fin >> target;
+    assert(fin.good());
+    //  fin.ignore(1); // skip comma
+    fin >> weight;
+    assert(fin.good());
+    // Ensure that the number of vertices is correct
+    if(source >= graph->num_vertices() ||
+       target >= graph->num_vertices())
+      graph->resize(std::max(source, target) + 1);
+    if(source != target) {
+      // Add the edge
+      edata e(weight);
+      graph->addEdge(source, target, e);
+    } else {
+      // add the self edge by updating the vertex weight
+      graph->getVertexData(source)->self_weight = weight;
+    }       
+  }
+
+  std::cout 
+    << "Finished loading graph with: " << std::endl
+    << "\t Vertices: " << graph->num_vertices() << std::endl
+    << "\t Edges: " << graph->num_edges() << std::endl;
+
+  graph->finalize();
+  std::cout << "Normalizing out edge weights." << std::endl;
+  // This could be done in graphlab but the focus of this app is
+  // demonstrating pagerank
+  for(int vid = 0; 
+      vid < graph->num_vertices(); ++vid) {
+    vdata* vd = graph->getVertexData(vid);
+    // Initialze with self out edge weight
+    double sum = vd->self_weight;
+    struct edge_info* out_edges = graph->getOutEdges(vid);
+
+    // Sum up weight on out edges
+    for(size_t i = 0; i < graph->getOutDegree(vid); ++i) {
+      sum += graph->getEdgeData(out_edges[i].edge_id)->weight;
+    }
+    if (sum == 0) {
+        vd->self_weight = 1.0;
+        sum = 1.0; //Dangling page
+    }
+
+    assert(sum > 0);
+    // divide everything by sum
+    vd->self_weight /= sum;
+    for(size_t i = 0; i < graph->getOutDegree(vid); ++i) {
+      graph->getEdgeData(out_edges[i].edge_id)->weight /= sum;
+    } 
+  }
+  std::cout << "Finished normalizing edes." << std::endl;
+
+  std::cout 
+    << "Finalizing graph." << std::endl
+    << "\t This is required for the locking protocol to function correctly"
+    << std::endl;
+
+  std::cout << "Finished finalization!" << std::endl;
+  return true;
+} // end of load graph
+

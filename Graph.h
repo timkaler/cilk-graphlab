@@ -31,11 +31,16 @@ class Graph {
   private:
     int vertexCount;
     int nextEdgeId;
-    std::map<int, VertexType> vertexData;
-    std::map<int, EdgeType> edgeData;
-    std::map<int, int> outDegree;
-    std::map<int, int> inDegree;
-    
+    std::map<int, VertexType> temp_vertexData;
+    std::map<int, EdgeType> temp_edgeData;
+    std::map<int, int> temp_outDegree;
+    std::map<int, int> temp_inDegree;
+   
+    VertexType* vertexData;
+    EdgeType* edgeData;
+    int* outDegree;
+    int* inDegree;
+ 
     // maps vertexId to start of out edges.
     int* out_edge_index;
     int* in_edge_index;
