@@ -18,13 +18,10 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
-//using namespace std; 
-
 struct edge_info {
   int edge_id;
   int out_vertex;
   int in_vertex;
-  //int neighbor_id;
 } edge_info;
 
 template<typename VertexType, typename EdgeType>
@@ -33,11 +30,6 @@ class Graph {
   private:
     int vertexCount;
     int nextEdgeId;
-    std::map<int, VertexType> temp_vertexData;
-    std::map<int, EdgeType> temp_edgeData;
-    std::map<int, int> temp_outDegree;
-    std::map<int, int> temp_inDegree;
-   
     std::vector<struct edge_info> temp_edges; 
     VertexType* vertexData;
     EdgeType* edgeData;
@@ -50,12 +42,6 @@ class Graph {
 
     struct edge_info* out_edges;
     struct edge_info* in_edges;
-
-    //std::vector<int, edge_info> out_edges;
-    //std::vector<int, edge_info> in_edges;
-
-    std::map<int, std::vector<struct edge_info> > temp_out_edges;
-    std::map<int, std::vector<struct edge_info> > temp_in_edges;
 
   public:
     Graph();
