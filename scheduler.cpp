@@ -17,7 +17,8 @@ Scheduler::Scheduler(int* vertexColors, int colorCount, int vertexCount) {
 }
 
 void Scheduler::add_task(int vid, void (*the_update_function) (int, void*)) {
-  if (__sync_bool_compare_and_swap(&vertex_task_added[vid], 0, 1)) {
+  if (vertex_task_added[vid] == 0 &&
+      __sync_bool_compare_and_swap(&vertex_task_added[vid], 0, 1)) {
     update_task t;
     t.vid = vid;
     t.update_fun = the_update_function;
@@ -26,8 +27,12 @@ void Scheduler::add_task(int vid, void (*the_update_function) (int, void*)) {
   }
 }
 
+void Scheduler::collect_tasks() {
+// do nothing
+}
 Bag<Scheduler::update_task>* Scheduler::get_task_bag() {
   if (currentColor >= colorCount) {
+    // this->collect_tasks();
     bool empty = true;
     delete vertex_task_added;
     vertex_task_added = (int*) calloc(numVertices, sizeof(int));
@@ -44,7 +49,6 @@ Bag<Scheduler::update_task>* Scheduler::get_task_bag() {
       return &currentBags[0]->get_reference();
     }
     currentColor = 0;
-    
   }
   
   while (currentBags[currentColor]->numElements() == 0) {

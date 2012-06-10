@@ -28,5 +28,6 @@ class Scheduler {
     Scheduler(int* vertexColors, int colorCount, int vertexCount);
     void add_task(int vid, void (*update_function) (int, void*));
     Bag<update_task>* get_task_bag();
+    void collect_tasks();
 };
 #endif

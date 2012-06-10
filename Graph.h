@@ -30,7 +30,8 @@ class Graph {
   private:
     int vertexCount;
     int nextEdgeId;
-    std::vector<struct edge_info> temp_edges; 
+    std::vector<struct edge_info> temp_edges;
+    
     VertexType* vertexData;
     EdgeType* edgeData;
     int* outDegree;
@@ -50,6 +51,7 @@ class Graph {
     void addVertex(int vid, VertexType vdata);
     void finalize();
     void resize(int size);
+    void prefetch_vertex(int vid);
     int compute_coloring();
     int getVertexColor(int vid);
     int getOutDegree(int vid);

@@ -1,15 +1,19 @@
 #include "Graph.h"
+
 template<typename VertexType, typename EdgeType>
 Graph<VertexType, EdgeType>::Graph< VertexType,  EdgeType>() {
-  // do nothing.
   nextEdgeId = 0;
 }
 
 template<typename VertexType, typename EdgeType>
 void Graph< VertexType,  EdgeType>::addEdge(int vid1, int vid2, EdgeType edgeInfo){
+  
+  // Grow the edgeData array. This should probably be replaced with a vector.
   if (nextEdgeId%10000 == 0) {
     edgeData = (EdgeType*) realloc(edgeData, (nextEdgeId+10000)*sizeof(EdgeType));
   }
+
+
   edgeData[nextEdgeId] = edgeInfo;
 
   struct edge_info edge;
@@ -70,6 +74,16 @@ void Graph<VertexType, EdgeType>::finalize(){
     out_edge_index[i] = out_edge_index[i] - outDegree[i]; 
     in_edge_index[i] = in_edge_index[i] - inDegree[i];
   } 
+}
+
+template<typename VertexType, typename EdgeType>
+void Graph<VertexType, EdgeType>::prefetch_vertex(int vid) {
+  _mm_prefetch((char*)&vertexData[vid], 3);
+  _mm_prefetch((char*)&inDegree[vid], 3);
+  _mm_prefetch((char*)&outDegree[vid], 3);
+  
+  _mm_prefetch((char*)&out_edges[vid], 3);
+  _mm_prefetch((char*)&in_edges[vid], 3);
 }
 
 template<typename VertexType, typename EdgeType>

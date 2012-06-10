@@ -5,6 +5,9 @@
 #include "bag.cpp"
 #include "Graph.cpp"
 #include "engine.cpp"
+void pagerank_update(int vid,
+                     void* scheduler_void);
+
 #include "scheduler.cpp"
 
 // Parameters for the pagerank demo application
