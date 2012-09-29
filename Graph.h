@@ -49,10 +49,17 @@ class Graph {
     int* vertexColors;
     void addEdge(int vid1, int vid2, EdgeType edgeInfo);
     void addVertex(int vid, VertexType vdata);
+    void partition(int v, int* order, int* partitionIndexIn, int* partitionIndexOut);
+    void updateIndices(int r, int v, int* order,
+        int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn,
+        int* currentIndexOut);
+    void colorVertex(int v);
     void finalize();
     void resize(int size);
     void prefetch_vertex(int vid);
     int compute_coloring();
+    int compute_coloring_rootset();
+    void validate_coloring();
     int getVertexColor(int vid);
     int getOutDegree(int vid);
     int getInDegree(int vid);

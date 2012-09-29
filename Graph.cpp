@@ -132,6 +132,221 @@ int Graph< VertexType,  EdgeType>::num_edges(){
 }
 
 template<typename VertexType, typename EdgeType>
+void Graph< VertexType, EdgeType>::validate_coloring() {
+  for (int v = 0; v < vertexCount; v++) {
+    struct edge_info* inEdges = getInEdges(v);
+    struct edge_info* outEdges = getOutEdges(v);
+
+    for (int i = 0; i < inDegree[v]; i++) {
+      if (getVertexColor(inEdges[i].out_vertex) == getVertexColor(v)) {
+        printf("Invalid coloring \n");
+        return;
+      }
+    }
+    for (int i = 0; i < outDegree[v]; i++) {
+      if (getVertexColor(outEdges[i].in_vertex) == getVertexColor(v)) {
+        printf("Invalid coloring \n");
+        return;
+      }
+    }
+  }
+  printf("Valid coloring \n");
+}
+template<typename VertexType, typename EdgeType>
+void updateIndices(int r, int v, int* order, int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn, int* currentIndexOut) {
+  struct edge_info* inEdges = getInEdges(v);
+  struct edge_info* outEdges = getOutEdges(v);
+
+  //if (r == inEdges[currentIndexIn[v]]) {
+    while (currentIndexIn[v] < partitionIndexIn[v]) {
+      int u = inEdges[currentIndexIn[v]];
+      if (vertexColors[u] != -1) {
+        currentIndexIn[v]++;
+      } else {
+        break;
+      }
+    }
+  //}
+  //if (r == outEdges[currentIndexOut[v]]) {
+    while (currentIndexOut[v] < partitionIndexOut[v]) {
+      int u = outEdges[currentIndexOut[v]];
+      if (vertexColors[u] != -1) {
+        currentIndexOut[v]++;
+      } else {
+        break;
+      }
+    }
+  //}
+}
+
+// returns true if this vertex is in the first root set.
+template<typename VertexType, typename EdgeType>
+void Graph< VertexType, EdgeType>::partition(int v, int* order, int* partitionIndexIn, int* partitionIndexOut) {
+  struct edge_info* inEdges = getInEdges(v);
+  struct edge_info* outEdges = getOutEdges(v);
+
+  int j = 0;
+  for (int i = 0; i < inDegree[v]; i++) {
+    if (order[inEdges[i].out_vertex] < order[v]) {
+      struct edge_info tmp = inEdges[j];
+      inEdges[j] = inEdges[i];
+      inEdges[i] = tmp;
+      j++;
+    }
+  }
+  partitionIndexIn[v] = j;
+
+  j = 0;
+  for (int i = 0; i < outDegree[v]; i++) {
+    if (order[outEdges[i].in_vertex] < order[v]) {
+      struct edge_info tmp = outEdges[j];
+      outEdges[j] = outEdges[i];;
+      outEdges[i] = tmp;
+      j++;
+    }
+  }
+  partitionIndexOut[v] = j;
+}
+
+
+template<typename VertexType, typename EdgeType>
+void Graph< VertexType, EdgeType>::colorVertex(int v) {
+  std::set<int> neighbor_colors;
+  struct edge_info * inEdges = getInEdges(v);
+  struct edge_info * outEdges = getOutEdges(v);
+  for (int i = 0; i < inDegree[v]; i++) {
+    int u = inEdges[i].out_vertex;
+    neighbor_colors.insert(getVertexColor(u));
+  }
+  for (int i = 0; i < outDegree[v]; i++) {
+    int u = outEdges[i].in_vertex;
+    neighbor_colors.insert(getVertexColor(u));
+  }
+  int color = 0;
+  while (neighbor_colors.find(color) != neighbor_colors.end()) {
+    color++;
+  }
+  vertexColors[v] = color;
+}
+
+template<typename VertexType, typename EdgeType>
+void Graph< VertexType, EdgeType>::updateIndices(int r, int v, int* order,
+    int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn,
+    int* currentIndexOut) {
+  struct edge_info* inEdges = getInEdges(v);
+  struct edge_info* outEdges = getOutEdges(v);
+
+  while (currentIndexIn[v] < partitionIndexIn[v]) {
+    int index = currentIndexIn[v];
+    int neighbor = inEdges[index].out_vertex;
+    if (vertexColors[neighbor] == -1) {
+      break;
+    }
+    currentIndexIn[v]++;
+  }
+
+  while (currentIndexOut[v] < partitionIndexOut[v]) {
+    int index = currentIndexOut[v];
+    int neighbor = outEdges[index].in_vertex;
+    if (vertexColors[neighbor] == -1) {
+      break;
+    }
+    currentIndexOut[v]++;
+  }
+}
+
+// Uses the root set method to compute a valid coloring.
+template<typename VertexType, typename EdgeType>
+int Graph< VertexType, EdgeType>::compute_coloring_rootset() {
+
+  // Step 1: Give the vertices an order.
+  std::vector<std::pair<int, int> > permutation(vertexCount);
+  cilk_for(int v = 0; v < vertexCount; v++) {
+    permutation[v] = std::make_pair(-(inDegree[v] + outDegree[v]), v);
+  }
+  std::sort(permutation.begin(), permutation.end());
+
+  int* order = (int*) malloc(sizeof(int) * vertexCount);
+  int* partitionIndexIn = (int*) calloc(sizeof(int), vertexCount);
+  int* partitionIndexOut = (int*) calloc(sizeof(int), vertexCount);
+
+  int* currentIndexIn = (int*) calloc(sizeof(int), vertexCount);
+  int* currentIndexOut = (int*) calloc(sizeof(int), vertexCount);
+
+  vertexColors = (int*) malloc(sizeof(int) * vertexCount);
+
+  cilk_for (int i = 0; i < vertexCount; i++) {
+    order[permutation[i].second] = i;
+    vertexColors[i] = -1;
+  }
+
+  // Step 2: Partition the adjacency lists of each vertex.
+  cilk_for (int v = 0; v < vertexCount; v++) {
+    partition(v, order, partitionIndexIn, partitionIndexOut);
+  }
+
+  int rootSetCount = 0;
+  std::vector<int> rootSet1;
+  std::vector<int> rootSet2;
+  std::vector<int> * rootSet = &rootSet1;
+  std::vector<int> * newRootSet = &rootSet2;
+  std::set<int> addedSet;
+  // Step 3: Identify the root sets.
+  for (int v = 0; v < vertexCount; v++) {
+    if (partitionIndexIn[v] == 0 && partitionIndexOut[v] == 0) {
+      rootSet->push_back(v);
+    }
+  }
+
+  int iterationCount = 0;
+  while (rootSet->size() > 0) {
+    rootSetCount++;
+    newRootSet->clear();
+    //printf("Root set size %d\n", (int)rootSet->size());
+    // Color the root set.
+    for (int i = 0; i < rootSet->size(); i++) {
+      colorVertex((*rootSet)[i]);
+    }
+    // Update the currentIndexIn and currentIndexOut
+    for (int i = 0; i < rootSet->size(); i++) {
+      int r = (*rootSet)[i];
+      for (int j = 0; j < inDegree[r]; j++) {
+        int v = getInEdges(r)[j].out_vertex;
+        if (vertexColors[v] != -1) {
+          continue;
+        }
+        updateIndices(r, v, order, partitionIndexIn, partitionIndexOut, currentIndexIn, currentIndexOut);
+        if (currentIndexIn[v] == partitionIndexIn[v] && currentIndexOut[v] == partitionIndexOut[v] &&
+            addedSet.find(v) == addedSet.end()) {
+          addedSet.insert(v);
+          newRootSet->push_back(v);
+        }
+      }
+      for (int j = 0; j < outDegree[r]; j++) {
+        int v = getOutEdges(r)[j].in_vertex;
+        if (vertexColors[v] != -1) {
+          continue;
+        }
+        updateIndices(r, v, order, partitionIndexIn, partitionIndexOut, currentIndexIn, currentIndexOut);
+        if (currentIndexIn[v] == partitionIndexIn[v] && currentIndexOut[v] == partitionIndexOut[v] &&
+            addedSet.find(v) == addedSet.end()) {
+          addedSet.insert(v);
+          newRootSet->push_back(v);
+        }
+      }
+    }
+    std::vector<int> * tmp = rootSet;
+    rootSet = newRootSet;
+    newRootSet = tmp;
+    iterationCount++;
+  }
+
+  printf("Elapsed execution time: %ds\n", rootSetCount);
+  return 10;
+}
+
+// Uses the prefix based method to compute a valid coloring.
+template<typename VertexType, typename EdgeType>
 int Graph< VertexType,  EdgeType>::compute_coloring(){
   // perform a parallel coloring of the graph.
   std::vector<std::pair<int, int> > permutation(vertexCount);

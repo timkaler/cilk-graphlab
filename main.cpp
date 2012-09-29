@@ -207,11 +207,12 @@ int main(int argc, char **argv)
   for (int i = 0; i < graph->num_vertices(); i++) {
     graph->getVertexData(i)->value = graph->getVertexData(i)->value / sum; 
   } 
-
   double color_start = tfk_get_time();
-  int colorCount = graph->compute_coloring();
+  int colorCount = graph->compute_coloring_rootset();
   double color_end = tfk_get_time();
-
+  //printf("Time spent coloring %f \n", (color_end-color_start));
+  graph->validate_coloring();
+  return 0;
   scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices());
   for (int i = 0; i < graph->num_vertices(); i++){ 
     scheduler->add_task(i, &pagerank_update);
