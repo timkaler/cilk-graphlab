@@ -152,32 +152,6 @@ void Graph< VertexType, EdgeType>::validate_coloring() {
   }
   printf("Valid coloring \n");
 }
-template<typename VertexType, typename EdgeType>
-void updateIndices(int r, int v, int* order, int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn, int* currentIndexOut) {
-  struct edge_info* inEdges = getInEdges(v);
-  struct edge_info* outEdges = getOutEdges(v);
-
-  //if (r == inEdges[currentIndexIn[v]]) {
-    while (currentIndexIn[v] < partitionIndexIn[v]) {
-      int u = inEdges[currentIndexIn[v]];
-      if (vertexColors[u] != -1) {
-        currentIndexIn[v]++;
-      } else {
-        break;
-      }
-    }
-  //}
-  //if (r == outEdges[currentIndexOut[v]]) {
-    while (currentIndexOut[v] < partitionIndexOut[v]) {
-      int u = outEdges[currentIndexOut[v]];
-      if (vertexColors[u] != -1) {
-        currentIndexOut[v]++;
-      } else {
-        break;
-      }
-    }
-  //}
-}
 
 // returns true if this vertex is in the first root set.
 template<typename VertexType, typename EdgeType>
@@ -230,29 +204,43 @@ void Graph< VertexType, EdgeType>::colorVertex(int v) {
 }
 
 template<typename VertexType, typename EdgeType>
-void Graph< VertexType, EdgeType>::updateIndices(int r, int v, int* order,
+bool Graph< VertexType, EdgeType>::updateIndices(int r, int v, int* order,
     int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn,
-    int* currentIndexOut) {
+    int* currentIndexOut, int* currentIndexInDynamic, int* currentIndexOutDynamic) {
   struct edge_info* inEdges = getInEdges(v);
   struct edge_info* outEdges = getOutEdges(v);
 
-  while (currentIndexIn[v] < partitionIndexIn[v]) {
-    int index = currentIndexIn[v];
+  if (currentIndexIn[v] < partitionIndexIn[v]) {
+    if (r != inEdges[currentIndexIn[v]].out_vertex) {
+      return false;
+    }
+  } else {
+    if (r != outEdges[currentIndexOut[v]].in_vertex) {
+      return false;
+    }
+  }
+
+  while (currentIndexInDynamic[v] < partitionIndexIn[v]) {
+    int index = currentIndexInDynamic[v];
     int neighbor = inEdges[index].out_vertex;
     if (vertexColors[neighbor] == -1) {
       break;
     }
-    currentIndexIn[v]++;
+    currentIndexInDynamic[v]++;
   }
+  currentIndexIn[v] = currentIndexInDynamic[v];
 
-  while (currentIndexOut[v] < partitionIndexOut[v]) {
-    int index = currentIndexOut[v];
+  while (currentIndexOutDynamic[v] < partitionIndexOut[v]) {
+    int index = currentIndexOutDynamic[v];
     int neighbor = outEdges[index].in_vertex;
     if (vertexColors[neighbor] == -1) {
       break;
     }
-    currentIndexOut[v]++;
+    currentIndexOutDynamic[v]++;
   }
+  currentIndexOut[v] = currentIndexOutDynamic[v];
+
+  return true;
 }
 
 // Uses the root set method to compute a valid coloring.
@@ -273,6 +261,9 @@ int Graph< VertexType, EdgeType>::compute_coloring_rootset() {
   int* currentIndexIn = (int*) calloc(sizeof(int), vertexCount);
   int* currentIndexOut = (int*) calloc(sizeof(int), vertexCount);
 
+  int* currentIndexInDynamic = (int*) calloc(sizeof(int), vertexCount);
+  int* currentIndexOutDynamic = (int*) calloc(sizeof(int), vertexCount);
+
   vertexColors = (int*) malloc(sizeof(int) * vertexCount);
 
   cilk_for (int i = 0; i < vertexCount; i++) {
@@ -290,7 +281,6 @@ int Graph< VertexType, EdgeType>::compute_coloring_rootset() {
   std::vector<int> rootSet2;
   std::vector<int> * rootSet = &rootSet1;
   std::vector<int> * newRootSet = &rootSet2;
-  std::set<int> addedSet;
   // Step 3: Identify the root sets.
   for (int v = 0; v < vertexCount; v++) {
     if (partitionIndexIn[v] == 0 && partitionIndexOut[v] == 0) {
@@ -315,10 +305,9 @@ int Graph< VertexType, EdgeType>::compute_coloring_rootset() {
         if (vertexColors[v] != -1) {
           continue;
         }
-        updateIndices(r, v, order, partitionIndexIn, partitionIndexOut, currentIndexIn, currentIndexOut);
-        if (currentIndexIn[v] == partitionIndexIn[v] && currentIndexOut[v] == partitionIndexOut[v] &&
-            addedSet.find(v) == addedSet.end()) {
-          addedSet.insert(v);
+        bool processed = updateIndices(r, v, order, partitionIndexIn, partitionIndexOut,
+            currentIndexIn, currentIndexOut, currentIndexInDynamic, currentIndexOutDynamic);
+        if (processed && currentIndexIn[v] == partitionIndexIn[v] && currentIndexOut[v] == partitionIndexOut[v]) {
           newRootSet->push_back(v);
         }
       }
@@ -327,10 +316,9 @@ int Graph< VertexType, EdgeType>::compute_coloring_rootset() {
         if (vertexColors[v] != -1) {
           continue;
         }
-        updateIndices(r, v, order, partitionIndexIn, partitionIndexOut, currentIndexIn, currentIndexOut);
-        if (currentIndexIn[v] == partitionIndexIn[v] && currentIndexOut[v] == partitionIndexOut[v] &&
-            addedSet.find(v) == addedSet.end()) {
-          addedSet.insert(v);
+        bool processed = updateIndices(r, v, order, partitionIndexIn, partitionIndexOut,
+            currentIndexIn, currentIndexOut, currentIndexInDynamic, currentIndexOutDynamic);
+        if (processed && currentIndexIn[v] == partitionIndexIn[v] && currentIndexOut[v] == partitionIndexOut[v]) {
           newRootSet->push_back(v);
         }
       }

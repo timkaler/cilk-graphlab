@@ -50,9 +50,9 @@ class Graph {
     void addEdge(int vid1, int vid2, EdgeType edgeInfo);
     void addVertex(int vid, VertexType vdata);
     void partition(int v, int* order, int* partitionIndexIn, int* partitionIndexOut);
-    void updateIndices(int r, int v, int* order,
+    bool updateIndices(int r, int v, int* order,
         int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn,
-        int* currentIndexOut);
+        int* currentIndexOut, int* currentIndexInDynamic, int* currentIndexOutDynamic);
     void colorVertex(int v);
     void finalize();
     void resize(int size);

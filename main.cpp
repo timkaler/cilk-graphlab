@@ -210,7 +210,7 @@ int main(int argc, char **argv)
   double color_start = tfk_get_time();
   int colorCount = graph->compute_coloring_rootset();
   double color_end = tfk_get_time();
-  //printf("Time spent coloring %f \n", (color_end-color_start));
+  printf("Time spent coloring %f \n", (color_end-color_start));
   graph->validate_coloring();
   return 0;
   scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices());
