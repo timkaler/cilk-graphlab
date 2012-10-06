@@ -14,7 +14,6 @@
 #include <cilk/reducer_min.h>
 #include <cilk/reducer_max.h>
 #include <cilk/holder.h>
-
 #ifndef GRAPH_H
 #define GRAPH_H
 
@@ -54,11 +53,13 @@ class Graph {
         int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn,
         int* currentIndexOut, int* currentIndexInDynamic, int* currentIndexOutDynamic);
     void colorVertex(int v);
+    void asyncColor(int v, int* order, int* counters, cilk::holder< std::set<int> >* neighbor_set_holder);
     void finalize();
     void resize(int size);
     void prefetch_vertex(int vid);
     int compute_coloring();
     int compute_coloring_rootset();
+    int compute_coloring_atomiccounter();
     void validate_coloring();
     int getVertexColor(int vid);
     int getOutDegree(int vid);

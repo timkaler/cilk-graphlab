@@ -204,6 +204,53 @@ void Graph< VertexType, EdgeType>::colorVertex(int v) {
 }
 
 template<typename VertexType, typename EdgeType>
+void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
+    cilk::holder< std::set<int> >* neighbor_set_holder)  {
+  std::set<int>& neighbor_colors = (*neighbor_set_holder)();
+  neighbor_colors.clear();
+  //std::set<int> neighbor_colors;
+  struct edge_info * inEdges = getInEdges(v);
+  struct edge_info * outEdges = getOutEdges(v);
+  for (int i = 0; i < inDegree[v]; i++) {
+    int u = inEdges[i].out_vertex;
+    neighbor_colors.insert(getVertexColor(u));
+  }
+  for (int i = 0; i < outDegree[v]; i++) {
+    int u = outEdges[i].in_vertex;
+    neighbor_colors.insert(getVertexColor(u));
+  }
+  int color = 0;
+  while (neighbor_colors.find(color) != neighbor_colors.end()) {
+    color++;
+  }
+  vertexColors[v] = color;
+
+  // decrement all bigger neighbors
+  cilk_for (int i = 0; i < inDegree[v]; i++) {
+    int u = inEdges[i].out_vertex;
+    if (order[u] > order[v]) {
+      //counters[u]--;
+      __sync_fetch_and_sub(&counters[u], 1);
+      if (__sync_bool_compare_and_swap(&counters[u], 0, -1)) {
+      //if (counters[u] == 0) {
+        asyncColor(u, order, counters, neighbor_set_holder);
+      }
+    }
+  }
+  cilk_for (int i = 0; i < outDegree[v]; i++) {
+    int u = outEdges[i].in_vertex;
+    if (order[u] > order[v]) {
+      //counters[u]--;
+      __sync_fetch_and_sub(&counters[u], 1);
+      if (__sync_bool_compare_and_swap(&counters[u], 0, -1)) {
+      //if (counters[u] == 0) {
+        asyncColor(u, order, counters, neighbor_set_holder);
+      }
+    }
+  }
+}
+
+template<typename VertexType, typename EdgeType>
 bool Graph< VertexType, EdgeType>::updateIndices(int r, int v, int* order,
     int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn,
     int* currentIndexOut, int* currentIndexInDynamic, int* currentIndexOutDynamic) {
@@ -372,8 +419,8 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
       if (vertexColors[vid] == -1) {
         min.calc_min(v);
         bool skip = false;
-        std::set<int> neighbor_colors = neighbor_colors_holder();
-
+        std::set<int>& neighbor_colors = neighbor_colors_holder();
+        neighbor_colors.clear();
         struct edge_info* in_edges = getInEdges(vid);
         struct edge_info* out_edges = getOutEdges(vid);
 
@@ -421,4 +468,56 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
   return the_max_color+1;
 }
 
+template<typename VertexType, typename EdgeType>
+int Graph< VertexType, EdgeType>::compute_coloring_atomiccounter() {
+  // Step 1: Give the vertices an order.
+  int* counters = (int*) malloc(sizeof(int)*vertexCount);
+  std::vector<std::pair<int, int> > permutation(vertexCount);
+  cilk_for(int v = 0; v < vertexCount; v++) {
+    permutation[v] = std::make_pair(-(inDegree[v] + outDegree[v]), v);
+  }
+  //std::sort(permutation.begin(), permutation.end());
+
+  int* order = (int*) malloc(sizeof(int) * vertexCount);
+  vertexColors = (int*) malloc(sizeof(int) * vertexCount);
+
+  cilk_for (int i = 0; i < vertexCount; i++) {
+    order[permutation[i].second] = i;
+    vertexColors[i] = -1;
+    counters[i] = 0;
+  }
+
+  // Step 2: Initialize the counters, given the order.
+  cilk_for (int i = 0; i < vertexCount; i++) {
+    struct edge_info* in_edges = getInEdges(i);
+    struct edge_info* out_edges = getOutEdges(i);
+    int count = 0;
+    for (int j = 0; j < inDegree[i]; j++) {
+      int neighbor = in_edges[j].out_vertex;
+      if (order[neighbor] < order[i]) {
+        count++;
+      }
+    }
+    for (int j = 0; j < outDegree[i]; j++) {
+      int neighbor = out_edges[j].in_vertex;
+      if (order[neighbor] < order[i]) {
+        count++;
+      }
+    }
+    counters[i] = count;
+  }
+  cilk::holder< std::set<int> > neighbor_set_holder;
+  // Step 3: Start the computation
+  cilk_for (int v = 0; v < vertexCount; v++) {
+    if (counters[v] == 0) {
+      asyncColor(v, order, counters, &neighbor_set_holder);
+    }
+  }
+  /*// compute the maximum color.
+  int maxColor = -1;
+  for (int i = 0; i < vertexCount; i++) {
+    maxColor = vertexColors[i] > maxColor ? vertexColors[i] : maxColor;
+  }*/
+  return 0;
+}
 

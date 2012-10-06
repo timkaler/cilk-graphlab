@@ -17,5 +17,5 @@ run :
 	touch V$(V)_D$(D).graph
 	rm V$(V)_D$(D).graph
 	python graph_gen.py $(V) $(D) >> V$(V)_D$(D).graph
-	./main V$(V)_D$(D).graph
+	perf record -f ./main V$(V)_D$(D).graph
 	rm V$(V)_D$(D).graph
