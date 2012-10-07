@@ -203,14 +203,34 @@ void Graph< VertexType, EdgeType>::colorVertex(int v) {
   vertexColors[v] = color;
 }
 
+void radix_sort(int* colors, int size, int radix) {
+
+  // Partition so that everything with a 0 bit is in left.
+  int j = 0;
+  for (int i = 0; i < size; i++) {
+    if (!(colors[i] & (1<<(radix-1)))) {
+      int tmp = colors[j];
+      colors[j] = colors[i];
+      colors[i] = tmp;
+      j++;
+    }
+  }
+
+  if (radix > 0) {
+    radix_sort(colors, j, radix - 1);
+    radix_sort(colors + j, size - j, radix - 1);
+  }
+}
+
 template<typename VertexType, typename EdgeType>
 void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
     cilk::holder< std::set<int> >* neighbor_set_holder)  {
   std::set<int>& neighbor_colors = (*neighbor_set_holder)();
   neighbor_colors.clear();
-  //std::set<int> neighbor_colors;
+
   struct edge_info * inEdges = getInEdges(v);
   struct edge_info * outEdges = getOutEdges(v);
+
   for (int i = 0; i < inDegree[v]; i++) {
     int u = inEdges[i].out_vertex;
     neighbor_colors.insert(getVertexColor(u));
@@ -223,11 +243,17 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
   while (neighbor_colors.find(color) != neighbor_colors.end()) {
     color++;
   }
+
   vertexColors[v] = color;
 
   // decrement all bigger neighbors
-  cilk_for (int i = 0; i < inDegree[v]; i++) {
-    int u = inEdges[i].out_vertex;
+  cilk_for (int i = 0; i < inDegree[v] + outDegree[v]; i++) {
+    int u;
+    if (i < inDegree[v]) {
+      u = inEdges[i].out_vertex;
+    } else {
+      u = outEdges[i - inDegree[v]].in_vertex;
+    }
     if (order[u] > order[v]) {
       //counters[u]--;
       __sync_fetch_and_sub(&counters[u], 1);
@@ -237,6 +263,7 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
       }
     }
   }
+/*
   cilk_for (int i = 0; i < outDegree[v]; i++) {
     int u = outEdges[i].in_vertex;
     if (order[u] > order[v]) {
@@ -248,6 +275,7 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
       }
     }
   }
+*/
 }
 
 template<typename VertexType, typename EdgeType>

@@ -208,8 +208,8 @@ int main(int argc, char **argv)
     graph->getVertexData(i)->value = graph->getVertexData(i)->value / sum; 
   } 
   double color_start = tfk_get_time();
-  //int colorCount = graph->compute_coloring_atomiccounter();
-  int colorCount = graph->compute_coloring();
+  int colorCount = graph->compute_coloring_atomiccounter();
+  //int colorCount = graph->compute_coloring();
   double color_end = tfk_get_time();
   printf("Time spent coloring %f \n", (color_end-color_start));
   printf("Number of colors %d \n", colorCount);
