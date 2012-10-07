@@ -231,20 +231,31 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
   struct edge_info * inEdges = getInEdges(v);
   struct edge_info * outEdges = getOutEdges(v);
 
-  for (int i = 0; i < inDegree[v]; i++) {
-    int u = inEdges[i].out_vertex;
-    neighbor_colors.insert(getVertexColor(u));
-  }
-  for (int i = 0; i < outDegree[v]; i++) {
-    int u = outEdges[i].in_vertex;
-    neighbor_colors.insert(getVertexColor(u));
-  }
-  int color = 0;
-  while (neighbor_colors.find(color) != neighbor_colors.end()) {
-    color++;
+  bool notFound = false;
+
+  cilk_for (int i = 0; i < inDegree[v] + outDegree[v]; i++) {
+    if (vertexColors[i] == 0) {
+      notFound = true;
+    }
   }
 
-  vertexColors[v] = color;
+  if (notFound) {
+    for (int i = 0; i < inDegree[v]; i++) {
+      int u = inEdges[i].out_vertex;
+      neighbor_colors.insert(getVertexColor(u));
+    }
+    for (int i = 0; i < outDegree[v]; i++) {
+      int u = outEdges[i].in_vertex;
+      neighbor_colors.insert(getVertexColor(u));
+    }
+    int color = 0;
+    while (neighbor_colors.find(color) != neighbor_colors.end()) {
+      color++;
+    }
+    vertexColors[v] = color;
+  } else {
+    vertexColors[v] = 0;
+  }
 
   // decrement all bigger neighbors
   cilk_for (int i = 0; i < inDegree[v] + outDegree[v]; i++) {
