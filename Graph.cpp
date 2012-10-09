@@ -231,32 +231,33 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
   struct edge_info * inEdges = getInEdges(v);
   struct edge_info * outEdges = getOutEdges(v);
 
-  bool notFound = false;
+  int* neighborColors = (int*) calloc(sizeof(int),inDegree[v] + outDegree[v]);
 
-  cilk_for (int i = 0; i < inDegree[v] + outDegree[v]; i++) {
-    if (vertexColors[i] == 0) {
-      notFound = true;
+  cilk_for(int i = 0; i < inDegree[v] + outDegree[v]; i++) {
+    int u;
+    if (i < inDegree[v]) {
+      u = inEdges[i].out_vertex;
+    } else {
+      u = outEdges[i - inDegree[v]].in_vertex;
+    }
+    int color = vertexColors[u];
+    if (order[u] < order[v] && color < inDegree[v] + outDegree[v]) {
+      neighborColors[color] = 1;
     }
   }
 
-  if (notFound) {
-    for (int i = 0; i < inDegree[v]; i++) {
-      int u = inEdges[i].out_vertex;
-      neighbor_colors.insert(getVertexColor(u));
+  int color = -1;
+  for (int i = 0; i < inDegree[v] + outDegree[v]; i++) {
+    if (neighborColors[i] == 0) {
+      color = i;
+      break;
     }
-    for (int i = 0; i < outDegree[v]; i++) {
-      int u = outEdges[i].in_vertex;
-      neighbor_colors.insert(getVertexColor(u));
-    }
-    int color = 0;
-    while (neighbor_colors.find(color) != neighbor_colors.end()) {
-      color++;
-    }
-    vertexColors[v] = color;
-  } else {
-    vertexColors[v] = 0;
   }
-
+  free(neighborColors);
+  if (color == -1) {
+    color = inDegree[v] + outDegree[v];
+  }
+  vertexColors[v] = color;
   // decrement all bigger neighbors
   cilk_for (int i = 0; i < inDegree[v] + outDegree[v]; i++) {
     int u;
@@ -515,7 +516,7 @@ int Graph< VertexType, EdgeType>::compute_coloring_atomiccounter() {
   cilk_for(int v = 0; v < vertexCount; v++) {
     permutation[v] = std::make_pair(-(inDegree[v] + outDegree[v]), v);
   }
-  //std::sort(permutation.begin(), permutation.end());
+  std::sort(permutation.begin(), permutation.end());
 
   int* order = (int*) malloc(sizeof(int) * vertexCount);
   vertexColors = (int*) malloc(sizeof(int) * vertexCount);
@@ -552,7 +553,7 @@ int Graph< VertexType, EdgeType>::compute_coloring_atomiccounter() {
       asyncColor(v, order, counters, &neighbor_set_holder);
     }
   }
-  /*// compute the maximum color.
+/*  // compute the maximum color.
   int maxColor = -1;
   for (int i = 0; i < vertexCount; i++) {
     maxColor = vertexColors[i] > maxColor ? vertexColors[i] : maxColor;
