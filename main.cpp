@@ -33,6 +33,7 @@ double tfk_get_time()
 // Programmer defined vertex and edge structures.
 struct vdata{
   double value;
+  double new_value;
   double self_weight; // GraphLab does not support edges from vertex to itself, so
   // we save weight of vertex's self-edge in the vertex data
   vdata(double value = 1) : value(value), self_weight(0) { }
@@ -132,6 +133,11 @@ bool load_graph_from_file(const std::string& filename) {
   return true;
 } // end of load graph
 
+void pagerank_write_phase(int vid, void* scheduler_void) {
+  vdata* vd = graph->getVertexData(vid);
+  vd->value = vd->new_value;
+}
+
 /**
  * The Page rank update function
  */
@@ -167,9 +173,9 @@ void pagerank_update(int vid,
   // compute the jumpweight
   sum = random_reset_prob/graph->num_vertices() + 
     (1-random_reset_prob)*sum;
-  vd->value = sum;
+  vd->new_value = sum;
   
-
+  scheduler->add_task(vid, &pagerank_write_phase, 0);
   struct edge_info* out_edges = graph->getOutEdges(vid);
   int out_degree = graph->getOutDegree(vid);
 
@@ -183,7 +189,7 @@ void pagerank_update(int vid,
 
     // If the neighbor changed sufficiently add to scheduler.
     if (residual > termination_bound) {
-      scheduler->add_task(out_edges[i].in_vertex, &pagerank_update);
+      scheduler->add_task(out_edges[i].in_vertex, &pagerank_update, 1);
     }
   }
 } // end of pagerank update function
@@ -207,6 +213,7 @@ int main(int argc, char **argv)
   srand(1);
   for (int i = 0; i < graph->num_vertices(); i++) {
     graph->getVertexData(i)->value = 1 + tfkRand(0, 1);
+    graph->getVertexData(i)->new_value = graph->getVertexData(i)->value;
     sum += graph->getVertexData(i)->value;
   }
 
@@ -214,15 +221,16 @@ int main(int argc, char **argv)
     graph->getVertexData(i)->value = graph->getVertexData(i)->value / sum; 
   } 
   double color_start = tfk_get_time();
-  int colorCount = graph->compute_coloring_atomiccounter();
+  //int colorCount = graph->compute_coloring_atomiccounter();
+  int colorCount = graph->compute_trivial_coloring();
   //int colorCount = graph->compute_coloring();
   double color_end = tfk_get_time();
   printf("Time spent coloring %f \n", (color_end-color_start));
   printf("Number of colors %d \n", colorCount);
   graph->validate_coloring();
-  scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices());
+  scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices(), 2);
   for (int i = 0; i < graph->num_vertices(); i++){ 
-    scheduler->add_task(i, &pagerank_update);
+    scheduler->add_task(i, &pagerank_update, 1);
   }
   
   engine<vdata, edata>* e = new engine<vdata, edata>(graph, scheduler);

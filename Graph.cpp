@@ -5,6 +5,7 @@ Graph<VertexType, EdgeType>::Graph< VertexType,  EdgeType>() {
   nextEdgeId = 0;
 }
 
+
 template<typename VertexType, typename EdgeType>
 void Graph< VertexType,  EdgeType>::addEdge(int vid1, int vid2, EdgeType edgeInfo){
 
@@ -401,6 +402,11 @@ int Graph< VertexType, EdgeType>::compute_coloring_rootset() {
 
   printf("Elapsed execution time: %ds\n", rootSetCount);
   return 10;
+}
+template<typename VertexType, typename EdgeType>
+int Graph< VertexType,  EdgeType>::compute_trivial_coloring(){
+  vertexColors = (int*)calloc(sizeof(int), vertexCount);
+  return 1;
 }
 
 // Uses the prefix based method to compute a valid coloring.

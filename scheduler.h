@@ -24,9 +24,10 @@ class Scheduler {
     int colorCount;
     int* vertex_task_added;
     int numVertices;
+    int num_functions;
   public:
-    Scheduler(int* vertexColors, int colorCount, int vertexCount);
-    void add_task(int vid, void (*update_function) (int, void*));
+    Scheduler(int* vertexColors, int colorCount, int vertexCount, int num_functions);
+    void add_task(int vid, void (*update_function) (int, void*), int num_function);
     Bag<update_task>* get_task_bag();
     void collect_tasks();
 };

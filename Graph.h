@@ -47,6 +47,7 @@ class Graph {
   public:
     Graph();
     int* vertexColors;
+    int compute_trivial_coloring();
     void addEdge(int vid1, int vid2, EdgeType edgeInfo);
     void addVertex(int vid, VertexType vdata);
     void partition(int v, int* order, int* partitionIndexIn, int* partitionIndexOut);
