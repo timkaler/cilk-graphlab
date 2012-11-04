@@ -21,6 +21,7 @@ struct edge_info {
   int edge_id;
   int out_vertex;
   int in_vertex;
+  int next;
 } edge_info;
 
 template<typename VertexType, typename EdgeType>

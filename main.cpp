@@ -190,12 +190,18 @@ void pagerank_update(int vid,
 
 int main(int argc, char **argv)
 {
+
   graph = new Graph<vdata, edata>();
 
   double load_start = tfk_get_time();
   load_graph_from_file(std::string(argv[1]));
   double load_end = tfk_get_time();
 
+  bool full_output = false;
+  if (argc > 2) {
+    full_output = true;
+    printf("full output \n");
+  }
 
   double sum = 0;
   srand(1);
@@ -214,7 +220,6 @@ int main(int argc, char **argv)
   printf("Time spent coloring %f \n", (color_end-color_start));
   printf("Number of colors %d \n", colorCount);
   graph->validate_coloring();
-  return 0;
   scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices());
   for (int i = 0; i < graph->num_vertices(); i++){ 
     scheduler->add_task(i, &pagerank_update);
@@ -236,8 +241,19 @@ int main(int argc, char **argv)
   printf("Total runtime (not including loading graph) %f \n", color_end + end - color_start - start);
   
   printf("\n*** First 5 pagerank values ***\n");
-  for (int i = 0; i < 5; i++) {
-    printf("vertex %d value is %g \n", i, graph->getVertexData(i)->value);
+  int output_num = 5;
+  if (full_output) {
+    output_num = graph->num_vertices();
+  }
+
+  double norm = 0;
+  // compute a normalizer.
+  for (int i = 0; i < graph->num_vertices(); i++) {
+    norm += graph->getVertexData(i)->value;
+  }
+
+  for (int i = 0; i < output_num; i++) {
+    printf("vertex %d value is %g \n", i, graph->getVertexData(i)->value/norm);
   }
   return 0;
 }

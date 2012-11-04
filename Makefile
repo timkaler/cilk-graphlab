@@ -1,6 +1,6 @@
-CC=icpc
+CC=icc
 CFLAGS= -O3
-CILK=icpc
+CILK=icc
 CILKFLAGS= -Wall -Werror -O3
 LDFLAGS= -L$(CURDIR)
 AR=ar

@@ -7,7 +7,7 @@ Graph<VertexType, EdgeType>::Graph< VertexType,  EdgeType>() {
 
 template<typename VertexType, typename EdgeType>
 void Graph< VertexType,  EdgeType>::addEdge(int vid1, int vid2, EdgeType edgeInfo){
-  
+
   // Grow the edgeData array. This should probably be replaced with a vector.
   if (nextEdgeId%10000 == 0) {
     edgeData = (EdgeType*) realloc(edgeData, (nextEdgeId+10000)*sizeof(EdgeType));
@@ -20,8 +20,8 @@ void Graph< VertexType,  EdgeType>::addEdge(int vid1, int vid2, EdgeType edgeInf
   edge.edge_id = nextEdgeId;
   edge.out_vertex = vid1;
   edge.in_vertex = vid2;
-  temp_edges.push_back(edge); 
-  nextEdgeId++; 
+  temp_edges.push_back(edge);
+  nextEdgeId++;
 }
 
 template<typename VertexType, typename EdgeType>
@@ -50,7 +50,7 @@ void Graph<VertexType, EdgeType>::finalize(){
   // compute the in degree and out degrees.
   for (int i = 0; i < temp_edges.size(); i++) {
     outDegree[temp_edges[i].out_vertex] += 1;
-    inDegree[temp_edges[i].in_vertex] += 1; 
+    inDegree[temp_edges[i].in_vertex] += 1;
   }
 
   // lets compute the out_edge and in_edge indices.
@@ -58,9 +58,9 @@ void Graph<VertexType, EdgeType>::finalize(){
   in_edge_index[0] = 0;
   for (int i = 1; i < vertexCount; i++) {
     out_edge_index[i] = out_edge_index[i-1] + outDegree[i-1];
-    in_edge_index[i] = in_edge_index[i-1] + inDegree[i-1]; 
+    in_edge_index[i] = in_edge_index[i-1] + inDegree[i-1];
   }
- 
+
   // now put all the edges into position.
   for (int i = 0; i < temp_edges.size(); i++) {
     int out_index = out_edge_index[temp_edges[i].out_vertex]++;
@@ -71,9 +71,9 @@ void Graph<VertexType, EdgeType>::finalize(){
 
   // now we need to subtract the degrees from the indicies.
   for (int i = 0; i < vertexCount; i++) {
-    out_edge_index[i] = out_edge_index[i] - outDegree[i]; 
+    out_edge_index[i] = out_edge_index[i] - outDegree[i];
     in_edge_index[i] = in_edge_index[i] - inDegree[i];
-  } 
+  }
 }
 
 template<typename VertexType, typename EdgeType>
@@ -81,7 +81,7 @@ void Graph<VertexType, EdgeType>::prefetch_vertex(int vid) {
   _mm_prefetch((char*)&vertexData[vid], 3);
   _mm_prefetch((char*)&inDegree[vid], 3);
   _mm_prefetch((char*)&outDegree[vid], 3);
-  
+
   _mm_prefetch((char*)&out_edges[vid], 3);
   _mm_prefetch((char*)&in_edges[vid], 3);
 }
@@ -204,7 +204,6 @@ void Graph< VertexType, EdgeType>::colorVertex(int v) {
 }
 
 void radix_sort(int* colors, int size, int radix) {
-
   // Partition so that everything with a 0 bit is in left.
   int j = 0;
   for (int i = 0; i < size; i++) {
@@ -253,7 +252,6 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
       break;
     }
   }
-  free(neighborColors);
   if (color == -1) {
     color = inDegree[v] + outDegree[v];
   }
@@ -267,27 +265,12 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
       u = outEdges[i - inDegree[v]].in_vertex;
     }
     if (order[u] > order[v]) {
-      //counters[u]--;
       __sync_fetch_and_sub(&counters[u], 1);
       if (__sync_bool_compare_and_swap(&counters[u], 0, -1)) {
-      //if (counters[u] == 0) {
         asyncColor(u, order, counters, neighbor_set_holder);
       }
     }
   }
-/*
-  cilk_for (int i = 0; i < outDegree[v]; i++) {
-    int u = outEdges[i].in_vertex;
-    if (order[u] > order[v]) {
-      //counters[u]--;
-      __sync_fetch_and_sub(&counters[u], 1);
-      if (__sync_bool_compare_and_swap(&counters[u], 0, -1)) {
-      //if (counters[u] == 0) {
-        asyncColor(u, order, counters, neighbor_set_holder);
-      }
-    }
-  }
-*/
 }
 
 template<typename VertexType, typename EdgeType>
@@ -425,17 +408,17 @@ template<typename VertexType, typename EdgeType>
 int Graph< VertexType,  EdgeType>::compute_coloring(){
   // perform a parallel coloring of the graph.
   std::vector<std::pair<int, int> > permutation(vertexCount);
-  
-  cilk_for(int v = 0; v < vertexCount; ++v){ 
+
+  cilk_for(int v = 0; v < vertexCount; ++v){
     permutation[v] = std::make_pair(-(inDegree[v] + outDegree[v]), v);
   }
   std::sort(permutation.begin(), permutation.end());
-   
+
   int* order = (int*) malloc(sizeof(int) * vertexCount);
   vertexColors = (int*) malloc(sizeof(int) * vertexCount);
 
   cilk_for (int i = 0; i < vertexCount; i++) {
-    order[permutation[i].second] = i; 
+    order[permutation[i].second] = i;
     vertexColors[i] = -1;
   }
 
@@ -469,16 +452,16 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
             skip = true;
             break;
           }
-          neighbor_colors.insert(vertexColors[in_edges[i].out_vertex]); 
+          neighbor_colors.insert(vertexColors[in_edges[i].out_vertex]);
         }
-        
+
         if (!skip) {
           for (int i = 0; i < outDegree[vid]; i++) {
             if (order[out_edges[i].in_vertex] < v && vertexColors[out_edges[i].in_vertex] == -1) {
               skip = true;
               break;
             }
-            neighbor_colors.insert(vertexColors[out_edges[i].in_vertex]); 
+            neighbor_colors.insert(vertexColors[out_edges[i].in_vertex]);
           }
         }
 
@@ -486,7 +469,7 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
           done = false;
         } else {
           int chosen_color = -1;
-          for (int j = 0; j < vertexCount; j++ ) { 
+          for (int j = 0; j < vertexCount; j++ ) {
             if (neighbor_colors.find(j) == neighbor_colors.end()){
               chosen_color = j;
               break;
@@ -553,11 +536,11 @@ int Graph< VertexType, EdgeType>::compute_coloring_atomiccounter() {
       asyncColor(v, order, counters, &neighbor_set_holder);
     }
   }
-/*  // compute the maximum color.
+  // compute the maximum color.
   int maxColor = -1;
   for (int i = 0; i < vertexCount; i++) {
     maxColor = vertexColors[i] > maxColor ? vertexColors[i] : maxColor;
-  }*/
-  return 0;
+  }
+  return maxColor + 1;
 }
 
