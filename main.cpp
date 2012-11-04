@@ -177,15 +177,15 @@ void pagerank_update(int vid,
     sum += contribution;
 
     // Remember this value as last read from the neighbor.
-    ed->old_source_value = neighbor_value;
-    //ed->new_source_value = neighbor_value;
+    //ed->old_source_value = neighbor_value;
+    ed->new_source_value = neighbor_value;
   }
 
   // compute the jumpweight
   sum = random_reset_prob/graph->num_vertices() + 
     (1-random_reset_prob)*sum;
-  vd->value = sum;
-  //scheduler->add_task(vid, &pagerank_write_phase, 0);
+  vd->new_value = sum;
+  scheduler->add_task(vid, &pagerank_write_phase, 0);
 
   struct edge_info* out_edges = graph->getOutEdges(vid);
   int out_degree = graph->getOutDegree(vid);
@@ -195,7 +195,7 @@ void pagerank_update(int vid,
     // Compute edge-specific residual by comparing the new value of this
     // vertex to the previous value seen by the neighbor vertex.
     double residual = 
-        ed->weight * std::fabs(ed->old_source_value - vd->value);
+        ed->weight * std::fabs(ed->old_source_value - vd->new_value);
 
     // If the neighbor changed sufficiently add to scheduler.
     if (residual > termination_bound) {
@@ -231,8 +231,8 @@ int main(int argc, char **argv)
     graph->getVertexData(i)->value = graph->getVertexData(i)->value / sum; 
   } 
   double color_start = tfk_get_time();
-  int colorCount = graph->compute_coloring_atomiccounter();
-  //int colorCount = graph->compute_trivial_coloring();
+  //int colorCount = graph->compute_coloring_atomiccounter();
+  int colorCount = graph->compute_trivial_coloring();
   //int colorCount = graph->compute_coloring();
   double color_end = tfk_get_time();
   printf("Time spent coloring %f \n", (color_end-color_start));
