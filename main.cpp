@@ -41,6 +41,7 @@ struct vdata{
 struct edata {
   double weight;
   double old_source_value;
+  double new_source_value;
   edata(double weight = 1) :
     weight(weight), old_source_value(0) { } 
 };
@@ -136,6 +137,15 @@ bool load_graph_from_file(const std::string& filename) {
 void pagerank_write_phase(int vid, void* scheduler_void) {
   vdata* vd = graph->getVertexData(vid);
   vd->value = vd->new_value;
+
+  struct edge_info* in_edges = graph->getInEdges(vid);
+  int in_degree = graph->getInDegree(vid);
+
+  for (int i = 0; i < in_degree; i++) {
+    // Get the edge data for the neighbor.
+    edata* ed = graph->getEdgeData(in_edges[i].edge_id);
+    ed->old_source_value = ed->new_source_value;
+  }
 }
 
 /**
@@ -168,20 +178,20 @@ void pagerank_update(int vid,
 
     // Remember this value as last read from the neighbor.
     ed->old_source_value = neighbor_value;
+    //ed->new_source_value = neighbor_value;
   }
 
   // compute the jumpweight
   sum = random_reset_prob/graph->num_vertices() + 
     (1-random_reset_prob)*sum;
-  vd->new_value = sum;
-  
-  scheduler->add_task(vid, &pagerank_write_phase, 0);
+  vd->value = sum;
+  //scheduler->add_task(vid, &pagerank_write_phase, 0);
+
   struct edge_info* out_edges = graph->getOutEdges(vid);
   int out_degree = graph->getOutDegree(vid);
 
   for (int i = 0; i < out_degree; i++) {
     edata* ed = graph->getEdgeData(out_edges[i].edge_id);
-    
     // Compute edge-specific residual by comparing the new value of this
     // vertex to the previous value seen by the neighbor vertex.
     double residual = 
@@ -221,8 +231,8 @@ int main(int argc, char **argv)
     graph->getVertexData(i)->value = graph->getVertexData(i)->value / sum; 
   } 
   double color_start = tfk_get_time();
-  //int colorCount = graph->compute_coloring_atomiccounter();
-  int colorCount = graph->compute_trivial_coloring();
+  int colorCount = graph->compute_coloring_atomiccounter();
+  //int colorCount = graph->compute_trivial_coloring();
   //int colorCount = graph->compute_coloring();
   double color_end = tfk_get_time();
   printf("Time spent coloring %f \n", (color_end-color_start));
@@ -259,7 +269,7 @@ int main(int argc, char **argv)
   for (int i = 0; i < graph->num_vertices(); i++) {
     norm += graph->getVertexData(i)->value;
   }
-
+  printf ("the norm is %f \n", norm);
   for (int i = 0; i < output_num; i++) {
     printf("vertex %d value is %g \n", i, graph->getVertexData(i)->value/norm);
   }
