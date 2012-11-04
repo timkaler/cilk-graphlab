@@ -11,13 +11,20 @@ template<typename VertexType, typename EdgeType>
 void engine<VertexType, EdgeType>::run(bool* terminated){
   int iterationCount = 0;
   Bag<Scheduler::update_task>* b = scheduler->get_task_bag(terminated);
-  *terminated = false;
+  *terminated = true;
   bool reset = false;
-  while (*terminated == false && b->numElements() > 0 /*&& iterationCount < 40*/) {
+  while (b->numElements() > 0 /*&& iterationCount < 40*/) {
     iterationCount++;
-    *terminated = true;
     parallel_process(b);
     b = scheduler->get_task_bag(&reset);
+    if (reset) {
+      if (*terminated) {
+        break;
+      } else {
+        *terminated = true;
+        reset = false;
+      }
+    }
   }
   printf("iteration count %d \n", iterationCount);
 }
