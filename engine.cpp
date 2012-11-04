@@ -8,14 +8,18 @@ engine<VertexType, EdgeType>::engine< VertexType,  EdgeType>(
 }
 
 template<typename VertexType, typename EdgeType>
-void engine<VertexType, EdgeType>::run(){
+void engine<VertexType, EdgeType>::run(bool* terminated){
   int iterationCount = 0;
-  Bag<Scheduler::update_task>* b = scheduler->get_task_bag();
-  while (b->numElements() > 0 /*&& iterationCount < 40*/) {
+  Bag<Scheduler::update_task>* b = scheduler->get_task_bag(terminated);
+  *terminated = false;
+  bool reset = false;
+  while (*terminated == false && b->numElements() > 0 /*&& iterationCount < 40*/) {
     iterationCount++;
-    parallel_process(b); 
-    b = scheduler->get_task_bag(); 
+    *terminated = true;
+    parallel_process(b);
+    b = scheduler->get_task_bag(&reset);
   }
+  printf("iteration count %d \n", iterationCount);
 }
 
 template<typename VertexType, typename EdgeType>

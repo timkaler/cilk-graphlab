@@ -32,8 +32,9 @@ void Scheduler::add_task(int vid, void (*the_update_function) (int, void*),
 void Scheduler::collect_tasks() {
 // do nothing
 }
-Bag<Scheduler::update_task>* Scheduler::get_task_bag() {
+Bag<Scheduler::update_task>* Scheduler::get_task_bag(bool* terminated) {
   if (currentColor >= colorCount * num_functions) {
+    *terminated = true;
     // this->collect_tasks();
     bool empty = true;
     delete vertex_task_added;
@@ -56,7 +57,7 @@ Bag<Scheduler::update_task>* Scheduler::get_task_bag() {
   while (currentBags[currentColor]->numElements() == 0) {
     currentColor++; 
     if (currentColor >= colorCount) {
-      return get_task_bag();
+      return get_task_bag(terminated);
     }
   }
   currentColor++;

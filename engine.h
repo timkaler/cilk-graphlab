@@ -27,7 +27,7 @@ class engine {
     Scheduler* scheduler;
   public:
     engine(Graph<VertexType, EdgeType>* graph, Scheduler* scheduler);
-    void run();
+    void run(bool* terminated);
     void process_update_task(Scheduler::update_task task);
     void process_update_tasks(const Scheduler::update_task* tasks, int taskCount);
     void parallel_process_pennant(Pennant<Scheduler::update_task>* p, int fillSize);

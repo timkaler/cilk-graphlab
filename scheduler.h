@@ -28,7 +28,7 @@ class Scheduler {
   public:
     Scheduler(int* vertexColors, int colorCount, int vertexCount, int num_functions);
     void add_task(int vid, void (*update_function) (int, void*), int num_function);
-    Bag<update_task>* get_task_bag();
+    Bag<update_task>* get_task_bag(bool* terminated);
     void collect_tasks();
 };
 #endif

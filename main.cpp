@@ -134,7 +134,9 @@ bool load_graph_from_file(const std::string& filename) {
   return true;
 } // end of load graph
 
+bool terminated = false;
 void pagerank_write_phase(int vid, void* scheduler_void) {
+  terminated = false;
   vdata* vd = graph->getVertexData(vid);
   vd->value = vd->new_value;
 
@@ -147,6 +149,7 @@ void pagerank_write_phase(int vid, void* scheduler_void) {
     ed->old_source_value = ed->new_source_value;
   }
 }
+
 
 /**
  * The Page rank update function
@@ -199,9 +202,14 @@ void pagerank_update(int vid,
 
     // If the neighbor changed sufficiently add to scheduler.
     if (residual > termination_bound) {
-      scheduler->add_task(out_edges[i].in_vertex, &pagerank_update, 1);
+      //if(terminated){
+        terminated = false;
+        //printf("terminated is false \n");
+      //}
+      //scheduler->add_task(out_edges[i].in_vertex, &pagerank_update, 1);
     }
   }
+  scheduler->add_task(vid, &pagerank_update, 1);
 } // end of pagerank update function
 
 int main(int argc, char **argv)
@@ -247,7 +255,7 @@ int main(int argc, char **argv)
    
 
   double start = tfk_get_time();
-  e->run();
+  e->run(&terminated);
   double end = tfk_get_time();
   printf("\n Graph Coloring: %d colors used \n", colorCount);
 
