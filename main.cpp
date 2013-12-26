@@ -5,6 +5,11 @@
 #include "bag.cpp"
 #include "Graph.cpp"
 #include "engine.cpp"
+
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
+using namespace cv;
+using namespace std;
 void pagerank_update(int vid,
                      void* scheduler_void);
 
@@ -38,6 +43,7 @@ struct vdata{
   // we save weight of vertex's self-edge in the vertex data
   vdata(double value = 1) : value(value), self_weight(0) { }
 };
+
 struct edata {
   double weight;
   double old_source_value;
@@ -212,10 +218,97 @@ void pagerank_update(int vid,
   scheduler->add_task(vid, &pagerank_update, 1);
 } // end of pagerank update function
 
+template<typename T>
+T* Mat_to_Row_Major (Mat& in) {
+    T* row_major = (T*) malloc(sizeof(T) * in.rows * in.cols);
+    cilk_for (int row = 0; row < in.rows; row++) {
+        Mat tmp2;
+        in.row(row).convertTo(tmp2, CV_8U);
+        T *ptemp = (T *) tmp2.ptr();
+        for (int j = 0; j < in.cols; j++) {
+          row_major[row*in.cols + j] = ptemp[j];
+        }
+    }
+    return row_major;
+}
+
+Graph<vdata, edata>* row_major_to_graph (uint8_t* row_major, int rows, int cols, int seed_x, int seed_y) {
+  Graph<vdata, edata>* graph = new Graph<vdata, edata>();
+  graph->resize(rows*cols);
+  for (int r = 0; r < rows; r++) {
+    for (int c = 0; c < cols; c++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+          if (r+dx < 0 || r+dx >= rows) continue;
+          if (c+dy < 0 || c+dy >= cols) continue;
+          float weight = (float)1 / (float) abs(row_major[r*rows + c] - row_major[(r+dx)*rows + c + dy]);
+          edata e(weight);
+          int source = r*rows + c;
+          int target = r*(rows+dx) + c + dy;
+          if (source != target) {
+            graph->addEdge(source, target, e);
+          } else {
+            graph->getVertexData(source)->self_weight = 0.5;
+            graph->getVertexData(source)->value = 0;
+            if (source == r*seed_y + seed_x) {
+              graph->getVertexData(source)->value = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+  return graph;
+}
+
 int main(int argc, char **argv)
 {
+  Mat im;
+  im = imread(argv[1],0);
+  im.convertTo(im,CV_8U);
+  printf("Success dims %d\n", im.dims);
+
+  printf("Converting opencv mat to row major array\n");
+  uint8_t* input_image = Mat_to_Row_Major<uint8_t>(im);
+
+  int seed_x = 850;
+  int seed_y = 900;
+
+  Graph<vdata, edata>* graph = row_major_to_graph(input_image, im.rows, im.cols, seed_x, seed_y);
+
+
+ printf("created graph with %d vertices and %d edges\n", graph->num_vertices(), graph->num_edges());
+/*
+  for (int i = 0; i < im.rows*im.cols; i++) {
+    if (i < 1000*500) {
+      input_image[i] = 100;
+    }
+    if (i < 1000*750  && i > 1000*750 + 750) {
+      input_image[i] = 100;
+    }
+  }*/
+  int colorCount = graph->compute_coloring_atomiccounter();
+  printf("Graph colored using %d colors\n", colorCount);
+  graph->validate_coloring();
+
+  printf("About to run pagerank on image\n");
+  scheduler = new Scheduler(graph->vertexColors, colorCount, graph->num_vertices(), 2);
+  for (int i = 0; i < graph->num_vertices(); i++){
+    scheduler->add_task(i, &pagerank_update, 1);
+  }
+  engine<vdata, edata>* e = new engine<vdata, edata>(graph, scheduler);
+
+  double start = tfk_get_time();
+  e->run(&terminated);
+  double end = tfk_get_time();
+  printf("done running\n");
+  Mat tmp = Mat(im.rows, im.cols, CV_8U, input_image);
+  imwrite("/afs/csail/u/t/tfk/public_html/test-image.jpg", tmp);
+  return 0;
+/*
 
   graph = new Graph<vdata, edata>();
+
 
   double load_start = tfk_get_time();
   load_graph_from_file(std::string(argv[1]));
@@ -281,6 +374,6 @@ int main(int argc, char **argv)
   for (int i = 0; i < output_num; i++) {
     printf("vertex %d value is %g \n", i, graph->getVertexData(i)->value/norm);
   }
-  return 0;
+  return 0;*/
 }
 

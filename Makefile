@@ -1,14 +1,15 @@
-CC=icc
+CC=icpc
 CFLAGS= -O3
-CILK=icc
+CILK=icpc
 CILKFLAGS= -Wall -Werror -O3
-LDFLAGS= -L$(CURDIR)
+LDFLAGS= -L$(CURDIR) -lopencv_highgui -lopencv_imgproc -lopencv_core
 AR=ar
 
+OPENCV=/usr/local/include/opencv
 all: main
 
 main : main.cpp Graph.cpp Graph.h bag.cpp bag.h scheduler.cpp scheduler.h engine.cpp engine.h Makefile
-	$(CILK) $(CILKFLAGS) $@.cpp $(LDFLAGS) -o $@
+	$(CILK) $(CILKFLAGS) -I$(OPENCV) $@.cpp $(LDFLAGS) -o $@
 
 clean :
 	rm -f main *~
