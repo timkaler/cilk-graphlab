@@ -1,7 +1,7 @@
 CC=icpc
 CFLAGS= -O3
 CILK=icpc
-CILKFLAGS= -Wall -Werror -O3
+CILKFLAGS= -Wall -Werror -O3 -g -lcilkrts
 LDFLAGS= -L$(CURDIR) -lopencv_highgui -lopencv_imgproc -lopencv_core
 AR=ar
 
