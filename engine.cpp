@@ -1,4 +1,7 @@
-#include "engine.h"
+// Copyright (c) 2013, Tim Kaler - MIT License
+
+#include <vector>
+#include "./engine.h"
 
 template<typename VertexType, typename EdgeType>
 engine<VertexType, EdgeType>::engine< VertexType,  EdgeType>(
@@ -8,68 +11,30 @@ engine<VertexType, EdgeType>::engine< VertexType,  EdgeType>(
 }
 
 template<typename VertexType, typename EdgeType>
-void engine<VertexType, EdgeType>::run(){
+void engine<VertexType, EdgeType>::run() {
   int iterationCount = 0;
-  Bag<Scheduler::update_task>* b = scheduler->get_task_bag();
-  while (b->numElements() > 0 /*&& iterationCount < 40*/) {
+  std::vector<std::vector<Scheduler::update_task>*> subbags =
+      scheduler->get_task_bag();
+  while (subbags.size() > 0) {
     iterationCount++;
-    parallel_process(b); 
-    b = scheduler->get_task_bag(); 
+    parallel_process(subbags);
+    subbags = scheduler->get_task_bag();
   }
+  printf("iteration count is %d\n", iterationCount);
 }
 
 template<typename VertexType, typename EdgeType>
-  void engine<VertexType, EdgeType>::process_update_task(Scheduler::update_task task) {
-    // code to process the update task here.
-    task.update_fun(task.vid, scheduler); 
-  } 
+void engine<VertexType, EdgeType>::process_update_task(
+    Scheduler::update_task task) {
+  task.update_fun(task.vid, scheduler);
+}
 
 template<typename VertexType, typename EdgeType>
-  void engine<VertexType, EdgeType>::process_update_tasks(const Scheduler::update_task* tasks, int taskCount) {
-    // prefetch data
-/*
-    for (int i = 0; i < taskCount; i++) {
-      graph->prefetch_vertex(tasks[i].vid);
-    }
-*/
-    for (int i = 0; i < taskCount; i++) {
-      process_update_task(tasks[i]);
+void engine<VertexType, EdgeType>::parallel_process(
+    std::vector<std::vector<Scheduler::update_task>*> subbags) {
+  cilk_for (int i = 0; i < subbags.size(); i++) {
+    cilk_for (int j = 0; j < subbags[i]->size(); j++) {
+      process_update_task((*(subbags[i]))[j]);
     }
   }
-
-template<typename VertexType, typename EdgeType>
-  void engine<VertexType, EdgeType>::parallel_process_pennant(Pennant<Scheduler::update_task>* p, int fillSize) {
-    if (p->getLeft() != NULL) {
-      cilk_spawn parallel_process_pennant(p->getLeft(), BLK_SIZE);
-    }
-    if (p->getRight() != NULL){
-      cilk_spawn parallel_process_pennant(p->getRight(), BLK_SIZE);
-    }
-    process_update_tasks(p->getElements(), fillSize);
-    
-    cilk_sync;
-    if (p->getLeft() != NULL) {
-      delete p->getLeft();
-    }
-
-    if (p->getRight() != NULL) {
-      delete p->getRight();
-    }
-  }
-
-template<typename VertexType, typename EdgeType>
-  void engine<VertexType, EdgeType>::parallel_process(Bag<Scheduler::update_task>* bag) {
-    Pennant<Scheduler::update_task>* p = NULL;
-    if (bag->getFill() > 0) {
-      bag->split(&p);
-      cilk_spawn parallel_process(bag);
-      parallel_process_pennant(p, BLK_SIZE);
-    } else {
-      process_update_tasks(bag->getFilling(), bag->getFillingSize());
-    }
-    cilk_sync;
-    if (p != NULL) {
-      delete p;
-    }
-  }
-
+}

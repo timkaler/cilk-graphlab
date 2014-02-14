@@ -1,33 +1,31 @@
-#include <iostream>
+// Copyright Tim Kaler 2013
+
 #include <stdio.h>
-#include <cstdlib> 
-#include <vector> 
+#include <cstdlib>
+#include <vector>
 #include <list>
 #include <map>
-#include "bag.h"
-#include "bag.cpp"
-#ifndef SCHEDULER_H
-#define SCHEDULER_H
-//using namespace std; 
+#include "./multibag.h"
+#ifndef SCHEDULER_H_
+#define SCHEDULER_H_
 
 class Scheduler {
-  public:
+ public:
     struct update_task{
       int vid;
-      void (*update_fun) (int, void*);
+      void (*update_fun)(int, void*);
     };
-  private:
-    Bag_reducer<update_task>** currentBags;
-    Bag_reducer<update_task>** nextBags;
+ private:
+    Multibag<update_task>* Q;
     int currentColor;
     int* vertexColors;
     int colorCount;
     int* vertex_task_added;
     int numVertices;
-  public:
+ public:
     Scheduler(int* vertexColors, int colorCount, int vertexCount);
-    void add_task(int vid, void (*update_function) (int, void*));
-    Bag<update_task>* get_task_bag();
+    void add_task(int vid, void (*update_function)(int, void*));
+    std::vector<std::vector<update_task>*> get_task_bag();
     void collect_tasks();
 };
-#endif
+#endif  // SCHEDULER_H_

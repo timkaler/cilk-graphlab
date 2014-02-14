@@ -1,18 +1,25 @@
-#include "Graph.h"
+// Copyright Tim Kaler 2013
+
+#include <utility>
+#include <algorithm>
+#include <vector>
+#include <set>
+#include "./Graph.h"
 
 template<typename VertexType, typename EdgeType>
-Graph<VertexType, EdgeType>::Graph< VertexType,  EdgeType>() {
+Graph<VertexType, EdgeType>::Graph<VertexType, EdgeType>() {
   nextEdgeId = 0;
 }
 
 template<typename VertexType, typename EdgeType>
-void Graph< VertexType,  EdgeType>::addEdge(int vid1, int vid2, EdgeType edgeInfo){
+void Graph<VertexType, EdgeType>::addEdge(
+    int vid1, int vid2, EdgeType edgeInfo) {
 
   // Grow the edgeData array. This should probably be replaced with a vector.
   if (nextEdgeId%10000 == 0) {
-    edgeData = (EdgeType*) realloc(edgeData, (nextEdgeId+10000)*sizeof(EdgeType));
+    edgeData = reinterpret_cast<EdgeType*>(
+        realloc(edgeData, (nextEdgeId+10000)*sizeof(EdgeType)));
   }
-
 
   edgeData[nextEdgeId] = edgeInfo;
 
@@ -25,27 +32,30 @@ void Graph< VertexType,  EdgeType>::addEdge(int vid1, int vid2, EdgeType edgeInf
 }
 
 template<typename VertexType, typename EdgeType>
-void Graph<VertexType, EdgeType>::addVertex(int vid, VertexType vdata){
+void Graph<VertexType, EdgeType>::addVertex(int vid, VertexType vdata) {
   assert(vertexCount > vid);
   vertexData[vid] = vdata;
 }
 
 template<typename VertexType, typename EdgeType>
-void Graph<VertexType, EdgeType>::resize(int size){
+void Graph<VertexType, EdgeType>::resize(int size) {
   vertexCount = size;
-  vertexData = (VertexType*) realloc(vertexData, vertexCount * sizeof(VertexType));
+  vertexData = reinterpret_cast<VertexType*>(
+      realloc(vertexData, vertexCount * sizeof(VertexType)));
 }
 
 template<typename VertexType, typename EdgeType>
-void Graph<VertexType, EdgeType>::finalize(){
-  out_edges = (struct edge_info*) calloc(nextEdgeId, sizeof(struct edge_info));
-  in_edges = (struct edge_info*) calloc(nextEdgeId, sizeof(struct edge_info));
+void Graph<VertexType, EdgeType>::finalize() {
+  out_edges = reinterpret_cast<struct edge_info*>(
+      calloc(nextEdgeId, sizeof(struct edge_info)));
+  in_edges = reinterpret_cast<struct edge_info*>(
+      calloc(nextEdgeId, sizeof(struct edge_info)));
 
-  out_edge_index = (int*) calloc(nextEdgeId, sizeof(int));
-  in_edge_index = (int*) calloc(nextEdgeId, sizeof(int));
+  out_edge_index = reinterpret_cast<int*>(calloc(nextEdgeId, sizeof(int)));
+  in_edge_index = reinterpret_cast<int*>(calloc(nextEdgeId, sizeof(int)));
 
-  outDegree = (int*) calloc(vertexCount, sizeof(int));
-  inDegree = (int*) calloc(vertexCount, sizeof(int));
+  outDegree = reinterpret_cast<int*>(calloc(vertexCount, sizeof(int)));
+  inDegree = reinterpret_cast<int*>(calloc(vertexCount, sizeof(int)));
 
   // compute the in degree and out degrees.
   for (int i = 0; i < temp_edges.size(); i++) {
@@ -78,61 +88,61 @@ void Graph<VertexType, EdgeType>::finalize(){
 
 template<typename VertexType, typename EdgeType>
 void Graph<VertexType, EdgeType>::prefetch_vertex(int vid) {
-  _mm_prefetch((char*)&vertexData[vid], 3);
-  _mm_prefetch((char*)&inDegree[vid], 3);
-  _mm_prefetch((char*)&outDegree[vid], 3);
+  _mm_prefetch(reinterpret_cast<char*>(&vertexData[vid]), 3);
+  _mm_prefetch(reinterpret_cast<char*>(&inDegree[vid]), 3);
+  _mm_prefetch(reinterpret_cast<char*>(&outDegree[vid]), 3);
 
-  _mm_prefetch((char*)&out_edges[vid], 3);
-  _mm_prefetch((char*)&in_edges[vid], 3);
+  _mm_prefetch(reinterpret_cast<char*>(&out_edges[vid]), 3);
+  _mm_prefetch(reinterpret_cast<char*>(&in_edges[vid]), 3);
 }
 
 template<typename VertexType, typename EdgeType>
-struct edge_info* Graph< VertexType,  EdgeType>::getOutEdges(int vid){
+struct edge_info* Graph<VertexType, EdgeType>::getOutEdges(int vid) {
   return &out_edges[out_edge_index[vid]];
 }
 
 template<typename VertexType, typename EdgeType>
-struct edge_info* Graph< VertexType,  EdgeType>::getInEdges(int vid){
+struct edge_info* Graph<VertexType, EdgeType>::getInEdges(int vid) {
   return &in_edges[in_edge_index[vid]];
 }
 
 template<typename VertexType, typename EdgeType>
-VertexType* Graph< VertexType,  EdgeType>::getVertexData(int vid){
+VertexType* Graph<VertexType, EdgeType>::getVertexData(int vid) {
   return &vertexData[vid];
 }
 
 template<typename VertexType, typename EdgeType>
-EdgeType* Graph< VertexType,  EdgeType>::getEdgeData(int eid){
+EdgeType* Graph<VertexType, EdgeType>::getEdgeData(int eid) {
   return &edgeData[eid];
 }
 
 template<typename VertexType, typename EdgeType>
-int Graph< VertexType,  EdgeType>::getVertexColor(int vid){
+int Graph<VertexType, EdgeType>::getVertexColor(int vid) {
   return vertexColors[vid];
 }
 
 template<typename VertexType, typename EdgeType>
-int Graph< VertexType,  EdgeType>::getOutDegree(int vid){
+int Graph<VertexType, EdgeType>::getOutDegree(int vid) {
   return outDegree[vid];
 }
 
 template<typename VertexType, typename EdgeType>
-int Graph< VertexType,  EdgeType>::getInDegree(int vid){
+int Graph<VertexType, EdgeType>::getInDegree(int vid) {
   return inDegree[vid];
 }
 
 template<typename VertexType, typename EdgeType>
-int Graph< VertexType,  EdgeType>::num_vertices(){
+int Graph<VertexType, EdgeType>::num_vertices() {
   return vertexCount;
 }
 
 template<typename VertexType, typename EdgeType>
-int Graph< VertexType,  EdgeType>::num_edges(){
+int Graph<VertexType, EdgeType>::num_edges() {
   return nextEdgeId;
 }
 
 template<typename VertexType, typename EdgeType>
-void Graph< VertexType, EdgeType>::validate_coloring() {
+void Graph<VertexType, EdgeType>::validate_coloring() {
   for (int v = 0; v < vertexCount; v++) {
     struct edge_info* inEdges = getInEdges(v);
     struct edge_info* outEdges = getOutEdges(v);
@@ -155,7 +165,8 @@ void Graph< VertexType, EdgeType>::validate_coloring() {
 
 // returns true if this vertex is in the first root set.
 template<typename VertexType, typename EdgeType>
-void Graph< VertexType, EdgeType>::partition(int v, int* order, int* partitionIndexIn, int* partitionIndexOut) {
+void Graph<VertexType, EdgeType>::partition(int v, int* order,
+    int* partitionIndexIn, int* partitionIndexOut) {
   struct edge_info* inEdges = getInEdges(v);
   struct edge_info* outEdges = getOutEdges(v);
 
@@ -184,7 +195,7 @@ void Graph< VertexType, EdgeType>::partition(int v, int* order, int* partitionIn
 
 
 template<typename VertexType, typename EdgeType>
-void Graph< VertexType, EdgeType>::colorVertex(int v) {
+void Graph<VertexType, EdgeType>::colorVertex(int v) {
   std::set<int> neighbor_colors;
   struct edge_info * inEdges = getInEdges(v);
   struct edge_info * outEdges = getOutEdges(v);
@@ -203,36 +214,19 @@ void Graph< VertexType, EdgeType>::colorVertex(int v) {
   vertexColors[v] = color;
 }
 
-void radix_sort(int* colors, int size, int radix) {
-  // Partition so that everything with a 0 bit is in left.
-  int j = 0;
-  for (int i = 0; i < size; i++) {
-    if (!(colors[i] & (1<<(radix-1)))) {
-      int tmp = colors[j];
-      colors[j] = colors[i];
-      colors[i] = tmp;
-      j++;
-    }
-  }
-
-  if (radix > 0) {
-    radix_sort(colors, j, radix - 1);
-    radix_sort(colors + j, size - j, radix - 1);
-  }
-}
-
 template<typename VertexType, typename EdgeType>
-void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
-    cilk::holder< std::set<int> >* neighbor_set_holder)  {
+void Graph<VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
+    cilk::holder< std::set<int> >* neighbor_set_holder) {
   std::set<int>& neighbor_colors = (*neighbor_set_holder)();
   neighbor_colors.clear();
 
   struct edge_info * inEdges = getInEdges(v);
   struct edge_info * outEdges = getOutEdges(v);
 
-  int* neighborColors = (int*) calloc(sizeof(int),inDegree[v] + outDegree[v]);
+  int* neighborColors = reinterpret_cast<int*>(
+      calloc(sizeof(int), inDegree[v] + outDegree[v]));
 
-  cilk_for(int i = 0; i < inDegree[v] + outDegree[v]; i++) {
+  cilk_for (int i = 0; i < inDegree[v] + outDegree[v]; i++) {
     int u;
     if (i < inDegree[v]) {
       u = inEdges[i].out_vertex;
@@ -256,6 +250,7 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
     color = inDegree[v] + outDegree[v];
   }
   vertexColors[v] = color;
+
   // decrement all bigger neighbors
   cilk_for (int i = 0; i < inDegree[v] + outDegree[v]; i++) {
     int u;
@@ -274,148 +269,23 @@ void Graph< VertexType, EdgeType>::asyncColor(int v, int* order, int* counters,
 }
 
 template<typename VertexType, typename EdgeType>
-bool Graph< VertexType, EdgeType>::updateIndices(int r, int v, int* order,
-    int* partitionIndexIn, int* partitionIndexOut, int* currentIndexIn,
-    int* currentIndexOut, int* currentIndexInDynamic, int* currentIndexOutDynamic) {
-  struct edge_info* inEdges = getInEdges(v);
-  struct edge_info* outEdges = getOutEdges(v);
-
-  if (currentIndexIn[v] < partitionIndexIn[v]) {
-    if (r != inEdges[currentIndexIn[v]].out_vertex) {
-      return false;
-    }
-  } else {
-    if (r != outEdges[currentIndexOut[v]].in_vertex) {
-      return false;
-    }
-  }
-
-  while (currentIndexInDynamic[v] < partitionIndexIn[v]) {
-    int index = currentIndexInDynamic[v];
-    int neighbor = inEdges[index].out_vertex;
-    if (vertexColors[neighbor] == -1) {
-      break;
-    }
-    currentIndexInDynamic[v]++;
-  }
-  currentIndexIn[v] = currentIndexInDynamic[v];
-
-  while (currentIndexOutDynamic[v] < partitionIndexOut[v]) {
-    int index = currentIndexOutDynamic[v];
-    int neighbor = outEdges[index].in_vertex;
-    if (vertexColors[neighbor] == -1) {
-      break;
-    }
-    currentIndexOutDynamic[v]++;
-  }
-  currentIndexOut[v] = currentIndexOutDynamic[v];
-
-  return true;
-}
-
-// Uses the root set method to compute a valid coloring.
-template<typename VertexType, typename EdgeType>
-int Graph< VertexType, EdgeType>::compute_coloring_rootset() {
-
-  // Step 1: Give the vertices an order.
-  std::vector<std::pair<int, int> > permutation(vertexCount);
-  cilk_for(int v = 0; v < vertexCount; v++) {
-    permutation[v] = std::make_pair(-(inDegree[v] + outDegree[v]), v);
-  }
-  std::sort(permutation.begin(), permutation.end());
-
-  int* order = (int*) malloc(sizeof(int) * vertexCount);
-  int* partitionIndexIn = (int*) calloc(sizeof(int), vertexCount);
-  int* partitionIndexOut = (int*) calloc(sizeof(int), vertexCount);
-
-  int* currentIndexIn = (int*) calloc(sizeof(int), vertexCount);
-  int* currentIndexOut = (int*) calloc(sizeof(int), vertexCount);
-
-  int* currentIndexInDynamic = (int*) calloc(sizeof(int), vertexCount);
-  int* currentIndexOutDynamic = (int*) calloc(sizeof(int), vertexCount);
-
-  vertexColors = (int*) malloc(sizeof(int) * vertexCount);
-
-  cilk_for (int i = 0; i < vertexCount; i++) {
-    order[permutation[i].second] = i;
-    vertexColors[i] = -1;
-  }
-
-  // Step 2: Partition the adjacency lists of each vertex.
-  cilk_for (int v = 0; v < vertexCount; v++) {
-    partition(v, order, partitionIndexIn, partitionIndexOut);
-  }
-
-  int rootSetCount = 0;
-  std::vector<int> rootSet1;
-  std::vector<int> rootSet2;
-  std::vector<int> * rootSet = &rootSet1;
-  std::vector<int> * newRootSet = &rootSet2;
-  // Step 3: Identify the root sets.
-  for (int v = 0; v < vertexCount; v++) {
-    if (partitionIndexIn[v] == 0 && partitionIndexOut[v] == 0) {
-      rootSet->push_back(v);
-    }
-  }
-
-  int iterationCount = 0;
-  while (rootSet->size() > 0) {
-    rootSetCount++;
-    newRootSet->clear();
-    //printf("Root set size %d\n", (int)rootSet->size());
-    // Color the root set.
-    for (int i = 0; i < rootSet->size(); i++) {
-      colorVertex((*rootSet)[i]);
-    }
-    // Update the currentIndexIn and currentIndexOut
-    for (int i = 0; i < rootSet->size(); i++) {
-      int r = (*rootSet)[i];
-      for (int j = 0; j < inDegree[r]; j++) {
-        int v = getInEdges(r)[j].out_vertex;
-        if (vertexColors[v] != -1) {
-          continue;
-        }
-        bool processed = updateIndices(r, v, order, partitionIndexIn, partitionIndexOut,
-            currentIndexIn, currentIndexOut, currentIndexInDynamic, currentIndexOutDynamic);
-        if (processed && currentIndexIn[v] == partitionIndexIn[v] && currentIndexOut[v] == partitionIndexOut[v]) {
-          newRootSet->push_back(v);
-        }
-      }
-      for (int j = 0; j < outDegree[r]; j++) {
-        int v = getOutEdges(r)[j].in_vertex;
-        if (vertexColors[v] != -1) {
-          continue;
-        }
-        bool processed = updateIndices(r, v, order, partitionIndexIn, partitionIndexOut,
-            currentIndexIn, currentIndexOut, currentIndexInDynamic, currentIndexOutDynamic);
-        if (processed && currentIndexIn[v] == partitionIndexIn[v] && currentIndexOut[v] == partitionIndexOut[v]) {
-          newRootSet->push_back(v);
-        }
-      }
-    }
-    std::vector<int> * tmp = rootSet;
-    rootSet = newRootSet;
-    newRootSet = tmp;
-    iterationCount++;
-  }
-
-  printf("Elapsed execution time: %ds\n", rootSetCount);
-  return 10;
+int Graph<VertexType, EdgeType>::compute_coloring() {
+  return compute_coloring_atomiccounter();
 }
 
 // Uses the prefix based method to compute a valid coloring.
 template<typename VertexType, typename EdgeType>
-int Graph< VertexType,  EdgeType>::compute_coloring(){
+int Graph<VertexType, EdgeType>::compute_coloring_prefix() {
   // perform a parallel coloring of the graph.
   std::vector<std::pair<int, int> > permutation(vertexCount);
 
-  cilk_for(int v = 0; v < vertexCount; ++v){
+  cilk_for (int v = 0; v < vertexCount; ++v) {
     permutation[v] = std::make_pair(-(inDegree[v] + outDegree[v]), v);
   }
   std::sort(permutation.begin(), permutation.end());
 
-  int* order = (int*) malloc(sizeof(int) * vertexCount);
-  vertexColors = (int*) malloc(sizeof(int) * vertexCount);
+  int* order = reinterpret_cast<int*>(malloc(sizeof(int) * vertexCount));
+  vertexColors = reinterpret_cast<int*>(malloc(sizeof(int) * vertexCount));
 
   cilk_for (int i = 0; i < vertexCount; i++) {
     order[permutation[i].second] = i;
@@ -429,7 +299,7 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
   while (true) {
     bool done = true;
     int stop;
-    if (max_success + prefix_length > vertexCount){
+    if (max_success + prefix_length > vertexCount) {
       stop = vertexCount;
     } else {
       stop = max_success + prefix_length;
@@ -437,7 +307,7 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
 
     cilk::reducer_min<int> min(max_success + prefix_length);
     cilk::holder< std::set<int> > neighbor_colors_holder;
-    cilk_for(int v = max_success; v < stop; v++) {
+    cilk_for (int v = max_success; v < stop; v++) {
       int vid = permutation[v].second;
       if (vertexColors[vid] == -1) {
         min.calc_min(v);
@@ -448,7 +318,8 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
         struct edge_info* out_edges = getOutEdges(vid);
 
         for (int i = 0; i < inDegree[vid]; i++) {
-          if (order[in_edges[i].out_vertex] < v && vertexColors[in_edges[i].out_vertex] == -1) {
+          if (order[in_edges[i].out_vertex] < v &&
+              vertexColors[in_edges[i].out_vertex] == -1) {
             skip = true;
             break;
           }
@@ -457,7 +328,8 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
 
         if (!skip) {
           for (int i = 0; i < outDegree[vid]; i++) {
-            if (order[out_edges[i].in_vertex] < v && vertexColors[out_edges[i].in_vertex] == -1) {
+            if (order[out_edges[i].in_vertex] < v &&
+                vertexColors[out_edges[i].in_vertex] == -1) {
               skip = true;
               break;
             }
@@ -469,8 +341,8 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
           done = false;
         } else {
           int chosen_color = -1;
-          for (int j = 0; j < vertexCount; j++ ) {
-            if (neighbor_colors.find(j) == neighbor_colors.end()){
+          for (int j = 0; j < vertexCount; j++) {
+            if (neighbor_colors.find(j) == neighbor_colors.end()) {
               chosen_color = j;
               break;
             }
@@ -491,18 +363,19 @@ int Graph< VertexType,  EdgeType>::compute_coloring(){
   return the_max_color+1;
 }
 
+// Compute coloring using the asynchronous rootset method /w atomic counters.
 template<typename VertexType, typename EdgeType>
-int Graph< VertexType, EdgeType>::compute_coloring_atomiccounter() {
+int Graph<VertexType, EdgeType>::compute_coloring_atomiccounter() {
   // Step 1: Give the vertices an order.
-  int* counters = (int*) malloc(sizeof(int)*vertexCount);
+  int* counters = reinterpret_cast<int*>(malloc(sizeof(int)*vertexCount));
   std::vector<std::pair<int, int> > permutation(vertexCount);
-  cilk_for(int v = 0; v < vertexCount; v++) {
+  cilk_for (int v = 0; v < vertexCount; v++) {
     permutation[v] = std::make_pair(-(inDegree[v] + outDegree[v]), v);
   }
   std::sort(permutation.begin(), permutation.end());
 
-  int* order = (int*) malloc(sizeof(int) * vertexCount);
-  vertexColors = (int*) malloc(sizeof(int) * vertexCount);
+  int* order = reinterpret_cast<int*>(malloc(sizeof(int) * vertexCount));
+  vertexColors = reinterpret_cast<int*>(malloc(sizeof(int) * vertexCount));
 
   cilk_for (int i = 0; i < vertexCount; i++) {
     order[permutation[i].second] = i;

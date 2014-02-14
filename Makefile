@@ -1,21 +1,24 @@
 CC=icc
-CFLAGS= -O3
+CFLAGS= -O3 -g
 CILK=icc
-CILKFLAGS= -Wall -Werror -O3
+CILKFLAGS= -Wall -Werror -O3 -g
 LDFLAGS= -L$(CURDIR)
 AR=ar
 
-all: main
+all: pagerank
 
-main : main.cpp Graph.cpp Graph.h bag.cpp bag.h scheduler.cpp scheduler.h engine.cpp engine.h Makefile
-	$(CILK) $(CILKFLAGS) $@.cpp $(LDFLAGS) -o $@
+pagerank : apps/pagerank.cpp Graph.cpp Graph.h multibag.h scheduler.cpp scheduler.h engine.cpp engine.h Makefile
+	$(CILK) $(CILKFLAGS) apps/$@.cpp $(LDFLAGS) -o $@
 
 clean :
-	rm -f main *~
+	rm -f main pagerank *~
 
-run :
+lint :
+	python cpplint.py *.cpp *.h
+
+run_pagerank : pagerank
 	touch V$(V)_D$(D).graph
 	rm V$(V)_D$(D).graph
 	python graph_gen.py $(V) $(D) >> V$(V)_D$(D).graph
-	./main V$(V)_D$(D).graph
+	./pagerank V$(V)_D$(D).graph
 	rm V$(V)_D$(D).graph
