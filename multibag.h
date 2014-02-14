@@ -102,7 +102,6 @@ std::vector<std::vector<T>*> Multibag<T>::get_vector_list(int color) {
   return collected_vectors[color];
 }
 
-// Unoptimized
 template <typename T>
 inline uint64_t
 Multibag<T>::numElements(int color) {
@@ -113,13 +112,11 @@ Multibag<T>::numElements(int color) {
   return total_size;
 }
 
-// Unoptimized
 template <typename T>
 inline bool Multibag<T>::isEmpty(int color) {
   return numElements(color) == 0;
 }
 
-// Unoptimized
 template <typename T>
 inline void Multibag<T>::clear() {
   cilk_for (int c = 0; c < ncolors; c++) {

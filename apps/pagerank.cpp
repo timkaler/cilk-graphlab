@@ -11,7 +11,7 @@
 #include "../scheduler.cpp"
 
 // Parameters for the pagerank demo application
-double termination_bound = 1e-20;
+double termination_bound = 1e-15;
 double random_reset_prob = 0.15;   // PageRank random reset probability
 
 // Simple [0,1] RNG
